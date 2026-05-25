@@ -1814,3 +1814,427 @@ body {
     width: min(560px, 90vw) !important;
   }
 }
+
+
+
+
+/* FINAL CLEAN OVERRIDES: remove flashy/3D style, keep readable and stable */
+.threeCinematicFx,
+.canvasCinematicFx,
+.royalCrown,
+.goldStorm,
+.sunBlast,
+.orbit,
+.neonTunnel,
+.rainbowRoad,
+.spaceWarp,
+.quadShock,
+.screenPunch,
+.gravityCrush,
+.pillar,
+.mansionFlash,
+.casinoVault,
+.houseDrop,
+.houseRing,
+.waterWave,
+.suitRain,
+.blueSplash,
+.tidalWall,
+.straightGrid,
+.lightningLine,
+.boltIcon,
+.thunderCloud,
+.triplePulse,
+.tripleText,
+.shockRings,
+.ring:not(.cleanRing):not(.miniRing),
+.dualBlades,
+.silverPulse,
+.particleField,
+.cinemaShake,
+.arenaFlash,
+.bustCrack,
+.redExplosion,
+.skullRain {
+  display: none !important;
+}
+
+body {
+  background:
+    radial-gradient(circle at 20% 10%, rgba(20, 120, 80, .20), transparent 30%),
+    linear-gradient(135deg, #07110e, #0c1512 50%, #050706) !important;
+}
+
+.loginCard, .card {
+  backdrop-filter: blur(10px);
+}
+
+.ghost, .soundMenu {
+  background: rgba(255,255,255,.10) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255,255,255,.18) !important;
+  box-shadow: none !important;
+}
+
+.pokerTable {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255,255,255,.09), transparent 22%),
+    radial-gradient(circle, #13784e, #0b5538 65%, #052719) !important;
+  border: 16px solid rgba(76, 43, 22, .95) !important;
+  box-shadow:
+    inset 0 0 70px rgba(0,0,0,.45),
+    0 28px 70px rgba(0,0,0,.50) !important;
+  overflow: visible !important;
+}
+
+.centerBoard,
+.community {
+  z-index: 80 !important;
+  position: relative;
+}
+
+.playerSeat {
+  z-index: 40 !important;
+}
+
+.playerCard {
+  transition: transform .35s ease, filter .35s ease, opacity .35s ease, background .35s ease, box-shadow .35s ease !important;
+}
+
+.playerSeat.busted .playerCard,
+.playerSeat.seatCollapsed .playerCard {
+  transform: translateY(24px) scale(.86) rotate(-2deg) !important;
+  opacity: .58 !important;
+  filter: grayscale(1) brightness(.65) !important;
+  background: rgba(35,35,35,.75) !important;
+  box-shadow: inset 0 0 20px rgba(0,0,0,.55), 0 8px 20px rgba(0,0,0,.45) !important;
+}
+
+.playerSeat.seatCollapsed::after {
+  content: "破产";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translate(-50%, -6px);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.72);
+  color: rgba(255,255,255,.86);
+  font-size: 12px;
+  font-weight: 900;
+  pointer-events: none;
+}
+
+.cleanHandOverlay,
+.cleanShowdown {
+  position: fixed;
+  inset: 0;
+  z-index: 9000 !important;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: transparent !important;
+  backdrop-filter: none !important;
+}
+
+.miniCleanEffect {
+  min-width: min(360px, 86vw);
+  padding: 22px 26px;
+  border-radius: 28px;
+  background: rgba(0,0,0,.72);
+  border: 1px solid rgba(255,255,255,.20);
+  color: #fff;
+  text-align: center;
+  box-shadow: 0 18px 60px rgba(0,0,0,.45);
+  position: relative;
+  overflow: hidden;
+}
+
+.miniRing,
+.cleanRing {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(260px, 66vw);
+  height: min(260px, 66vw);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 4px solid rgba(245,214,108,.55);
+  animation: cleanRingPulse 1.4s ease-out infinite;
+}
+
+.handTitle {
+  position: relative;
+  z-index: 2;
+  font-size: clamp(24px, 5vw, 42px);
+  font-weight: 1000;
+}
+
+.cleanEffect {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.cleanPulse {
+  width: min(380px, 82vw);
+  height: min(380px, 82vw);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(245,214,108,.25), transparent 62%);
+  animation: cleanPulse 1.8s ease-in-out infinite alternate;
+}
+
+.cleanLabel {
+  position: absolute;
+  font-size: clamp(52px, 12vw, 128px);
+  font-weight: 1000;
+  letter-spacing: .04em;
+  color: rgba(255,255,255,.16);
+  text-shadow: none;
+}
+
+.effect-onepair .cleanRing,
+.clean-onepair .cleanRing,
+.mini-onepair .miniRing { border-color: rgba(255,255,255,.55); }
+
+.effect-twopair .cleanRing,
+.clean-twopair .cleanRing,
+.mini-twopair .miniRing { border-color: rgba(120,190,255,.65); }
+
+.effect-threekind .cleanRing,
+.clean-threekind .cleanRing,
+.mini-threekind .miniRing { border-color: rgba(255,180,100,.70); }
+
+.effect-straight .cleanRing,
+.clean-straight .cleanRing,
+.mini-straight .miniRing { border-color: rgba(130,255,115,.70); }
+
+.effect-flush .cleanRing,
+.clean-flush .cleanRing,
+.mini-flush .miniRing { border-color: rgba(90,210,255,.72); }
+
+.effect-fullhouse .cleanRing,
+.clean-fullhouse .cleanRing,
+.mini-fullhouse .miniRing { border-color: rgba(255,205,88,.82); }
+
+.effect-fourkind .cleanRing,
+.clean-fourkind .cleanRing,
+.mini-fourkind .miniRing { border-color: rgba(210,140,255,.82); }
+
+.effect-straightflush .cleanRing,
+.clean-straightflush .cleanRing,
+.mini-straightflush .miniRing { border-color: rgba(157,255,252,.92); }
+
+.effect-royal .cleanRing,
+.clean-royal .cleanRing,
+.mini-royal .miniRing { border-color: rgba(255,215,0,.95); box-shadow: 0 0 28px rgba(255,215,0,.35); }
+
+.cleanResultCard {
+  position: relative;
+  z-index: 4 !important;
+  width: min(560px, 88vw);
+  padding: 26px 24px;
+  border-radius: 30px;
+  background: rgba(255,255,255,.92) !important;
+  color: #10130f !important;
+  text-align: center;
+  box-shadow: 0 22px 80px rgba(0,0,0,.42) !important;
+  backdrop-filter: none !important;
+}
+
+.cleanResultCard .showTitle {
+  font-size: clamp(30px, 7vw, 62px) !important;
+  font-weight: 1000;
+  margin-bottom: 12px;
+}
+
+.cleanWinnerName {
+  font-size: clamp(26px, 5vw, 46px);
+  font-weight: 1000;
+  line-height: 1.05;
+}
+
+.cleanWinnerHand {
+  margin-top: 8px;
+  font-size: clamp(20px, 4vw, 36px);
+  font-weight: 1000;
+}
+
+.cleanBustedText,
+.finalLine {
+  margin-top: 14px;
+  font-size: clamp(18px, 3.6vw, 30px);
+  font-weight: 1000;
+}
+
+.cleanBust .collapseIcon {
+  font-size: clamp(72px, 18vw, 160px);
+  animation: cleanDrop .9s ease-in both;
+  opacity: .92;
+}
+
+.emojiRain {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: -12vh;
+  text-align: center;
+  font-size: clamp(38px, 8vw, 84px);
+  letter-spacing: 18px;
+  animation: cleanEmojiRain 3.2s linear infinite;
+  opacity: .78;
+}
+
+.previewMenu {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(245,214,108,.12), transparent 34%),
+    linear-gradient(135deg, #07110e, #050706);
+  color: #fff;
+  overflow: auto;
+  padding: 22px;
+}
+
+.previewPanel {
+  width: min(1050px, 96vw);
+  margin: 0 auto;
+}
+
+.previewPanel h1 {
+  margin: 8px 0 6px;
+  font-size: clamp(34px, 8vw, 72px);
+}
+
+.previewPanel p {
+  color: rgba(255,255,255,.70);
+  margin: 0 0 14px;
+}
+
+.previewExit {
+  width: auto;
+  padding: 11px 16px;
+  margin: 8px 0 16px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.20);
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.previewHand {
+  min-height: 48px;
+  border-radius: 16px;
+  background: rgba(245,214,108,.92);
+  color: #15110a;
+  font-weight: 1000;
+}
+
+.previewStage {
+  position: relative;
+  min-height: 420px;
+  border-radius: 30px;
+  background:
+    radial-gradient(circle, #13784e, #0b5538 62%, #052719);
+  border: 14px solid rgba(76, 43, 22, .95);
+  box-shadow: inset 0 0 60px rgba(0,0,0,.38);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.previewEffectBox {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.previewEffectText {
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.62);
+  color: #fff;
+  font-weight: 1000;
+  z-index: 5;
+}
+
+.previewSeat {
+  position: relative;
+  z-index: 6;
+  width: 170px;
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(0,0,0,.52);
+  border: 1px solid rgba(255,255,255,.18);
+  text-align: center;
+  transition: all .4s ease;
+}
+
+.previewSeat .seatAvatar {
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 10px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255,255,255,.16);
+  font-size: 32px;
+  font-weight: 1000;
+}
+
+.previewSeat.seatCollapsed {
+  transform: translateY(42px) scale(.82) rotate(-3deg);
+  opacity: .55;
+  filter: grayscale(1) brightness(.65);
+}
+
+@keyframes cleanRingPulse {
+  from { transform: translate(-50%, -50%) scale(.55); opacity: .95; }
+  to { transform: translate(-50%, -50%) scale(1.35); opacity: 0; }
+}
+
+@keyframes cleanPulse {
+  from { transform: scale(.88); opacity: .35; }
+  to { transform: scale(1.08); opacity: .70; }
+}
+
+@keyframes cleanFadeOut {
+  to { opacity: 0; transform: scale(.98); }
+}
+
+@keyframes cleanDrop {
+  0% { transform: translateY(-80px) scale(.7); opacity: 0; }
+  55% { opacity: 1; }
+  100% { transform: translateY(18px) scale(1); opacity: .92; }
+}
+
+@keyframes cleanEmojiRain {
+  from { transform: translateY(-20vh); opacity: 0; }
+  15% { opacity: .85; }
+  to { transform: translateY(120vh); opacity: 0; }
+}
+
+@media (max-width: 760px) {
+  .previewStage {
+    min-height: 360px;
+  }
+  .emojiRain {
+    letter-spacing: 8px;
+  }
+}
