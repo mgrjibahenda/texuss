@@ -1,17 +1,10 @@
 {
-  "name": "texas-holdem-v18-1-second-hand-fix",
-  "version": "18.1.0",
-  "description": "Final optimized Texas Hold'em with second-hand action fix.",
+  "name": "texas-holdem-v8-final-table",
+  "version": "8.0.0",
+  "description": "Texas Hold'em v8 with final winner settlement, disconnect recovery, effects gallery and upgraded visuals.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "test:hands": "node tests/hand-evaluator-smoke-test.js",
-    "test:hardfix": "node tests/rule-hardfix-static-test.js",
-    "test:core-static": "node tests/core-static-test.js",
-    "test:v17": "node tests/v17-playable-test.js",
-    "test:no-preview": "node tests/no-preview-test.js",
-    "test:final": "node tests/final-optimized-test.js",
-    "test:secondhand": "node tests/second-hand-fix-test.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.3",
