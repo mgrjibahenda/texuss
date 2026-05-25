@@ -8,34 +8,17 @@
 </head>
 <body>
   <main class="app">
-    
-<section id="login" class="loginScreen">
-      <div class="loginShell">
-        <div class="suitLogo"><span>♠</span><span>♥</span></div>
-        <h1>TEXAS HOLD'EM</h1>
-        <p class="subtitle">多人联机版</p>
-
-        <div id="mainMenuPanel" class="loginPanel">
-          <button id="createModeBtn" class="goldWide">创建房间</button>
-          <button id="joinModeBtn" class="outlineWide">加入房间</button>
+    <section id="login" class="loginScreen">
+      <div class="loginCard">
+        <div class="brandMark">♠</div>
+        <h1>Texas Hold'em</h1>
+        <p>Private room · virtual chips only</p>
+        <input id="name" placeholder="Player name" maxlength="18" />
+        <button id="createBtn" class="primary wide">Create Room</button>
+        <div class="joinLine">
+          <input id="roomCode" placeholder="Room code" maxlength="5" />
+          <button id="joinBtn">Join</button>
         </div>
-
-        <div id="createPanel" class="loginPanel hidden">
-          <label>你的名字</label>
-          <input id="name" placeholder="输入名字..." maxlength="18" />
-          <button id="createBtn" class="goldWide">创建并进入</button>
-          <button id="backFromCreate" class="backBtn">← 返回</button>
-        </div>
-
-        <div id="joinPanel" class="loginPanel hidden">
-          <label>房间号（4位）</label>
-          <input id="roomCode" placeholder="A B C D" maxlength="5" />
-          <label>你的名字</label>
-          <input id="joinName" placeholder="输入名字..." maxlength="18" />
-          <button id="joinBtn" class="goldWide">加入游戏</button>
-          <button id="backFromJoin" class="backBtn">← 返回</button>
-        </div>
-
         <p id="loginError" class="error"></p>
       </div>
     </section>
