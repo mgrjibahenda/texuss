@@ -79,3 +79,13 @@ npm run test:hands
 - Added short per-player duplicate action guard.
 - Client now sends `actionSeq` and temporarily disables action buttons after a click.
 - This targets the bug where one player could appear to check twice because an old click was accepted after the street advanced.
+
+
+## 14.4 Hard Fix
+
+- Fixed valid action buttons becoming ineffective after another player acted.
+- Removed strict `actionSeq` rejection. The server now relies on the authoritative current-turn check instead of rejecting a real current player because their browser had a stale sequence number.
+- Kept duplicate-click protection, but only after an action is valid.
+- Reduced Socket.IO ping timeout so disconnects are detected faster.
+- Disconnect during a hand still cancels the hand and refunds committed chips to remaining players.
+- Added `npm run test:hardfix` static safety test.

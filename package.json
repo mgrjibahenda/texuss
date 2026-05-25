@@ -1,11 +1,12 @@
 {
   "name": "texas-holdem-stable-pro",
-  "version": "14.3.0",
-  "description": "Stable Texas Hold'em rule fixes: all-in board runout and anti-duplicate actions.",
+  "version": "14.4.0",
+  "description": "Stable Texas Hold'em hard fix: current-turn actions never fail from stale actionSeq; faster disconnect detection.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test:hands": "node tests/hand-evaluator-smoke-test.js"
+    "test:hands": "node tests/hand-evaluator-smoke-test.js",
+    "test:hardfix": "node tests/rule-hardfix-static-test.js"
   },
   "dependencies": {
     "express": "^4.18.3",

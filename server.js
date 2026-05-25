@@ -5,7 +5,10 @@ const crypto = require("crypto");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  pingInterval: 5000,
+  pingTimeout: 7000
+});
 app.use(express.static("public"));
 
 const PORT = process.env.PORT || 3000;
@@ -662,28 +665,30 @@ io.on("connection", (socket) => {
     if (room.players[room.turnIndex]?.id !== socket.id) return;
     if (player.folded || player.allIn) return;
 
-    // Prevent stale/double-click actions. The client must send the actionSeq it saw.
-    // If the server already advanced to a new street/turn, old clicks are ignored.
-    if (Number(actionSeq) !== Number(room.actionSeq || 0)) return;
-
+    // The server turn check above is the real authority.
+    // Do NOT reject a valid current-turn action only because the browser has an older actionSeq.
+    // That caused valid buttons to appear dead after another player acted.
     const now = Date.now();
-    if (player.lastActionAt && now - player.lastActionAt < 220) return;
-    player.lastActionAt = now;
+    if (player.lastActionAt && now - player.lastActionAt < 120) return;
 
     const callAmount = Math.max(0, room.currentBet - player.bet);
+    let acceptedAction = false;
 
     if (type === "fold") {
       player.folded = true;
       room.actedThisRound.add(player.id);
       room.lastAction = `${player.name} folds.`;
+      acceptedAction = true;
     } else if (type === "check") {
       if (callAmount !== 0) return;
       room.actedThisRound.add(player.id);
       room.lastAction = `${player.name} checks.`;
+      acceptedAction = true;
     } else if (type === "call") {
       const paid = takeChips(player, callAmount);
       room.actedThisRound.add(player.id);
       room.lastAction = `${player.name} calls ${paid}.`;
+      acceptedAction = true;
     } else if (type === "raise") {
       amount = Number(amount);
       if (!Number.isFinite(amount)) return;
@@ -715,6 +720,7 @@ io.on("connection", (socket) => {
       }
 
       room.lastAction = `${player.name} ${player.allIn ? "goes all-in to" : "raises to"} ${player.bet}.`;
+      acceptedAction = true;
     } else if (type === "allin") {
       const previousBet = room.currentBet;
       takeChips(player, player.chips);
@@ -733,8 +739,11 @@ io.on("connection", (socket) => {
         room.actedThisRound.add(player.id);
       }
       room.lastAction = `${player.name} goes all-in.`;
+      acceptedAction = true;
     }
 
+    if (!acceptedAction) return;
+    player.lastActionAt = now;
     room.message = room.lastAction;
     room.actionSeq = (room.actionSeq || 0) + 1;
     afterAction(room);
@@ -821,6 +830,8 @@ io.on("connection", (socket) => {
       resetHandToLobbyAfterDisconnect(room, disconnectedName);
     } else {
       room.message = `${disconnectedName} disconnected and was kicked.`;
+      room.lastAction = "Player disconnected.";
+      room.actionSeq = (room.actionSeq || 0) + 1;
       room.players.forEach((p, i) => { p.seat = i; });
     }
 

@@ -547,6 +547,7 @@ function renderActions() {
   const me = state.players.find(p => p.isYou);
   const isMyTurn = me && state.players[state.turnIndex]?.id === me.id && !["lobby", "showdown"].includes(state.phase);
 
+  if (isMyTurn) actionSubmitting = false;
   panel.classList.toggle("hidden", !isMyTurn);
   if (!isMyTurn) return;
 
