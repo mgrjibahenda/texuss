@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Texas Hold'em Premium</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main class="app">
+    <section id="login" class="loginScreen">
+      <div class="loginCard">
+        <div class="brandMark">♠</div>
+        <h1>Texas Hold'em</h1>
+        <p>Private room · virtual chips only</p>
+        <input id="name" placeholder="Player name" maxlength="18" />
+        <button id="createBtn" class="primary wide">Create Room</button>
+        <button id="galleryBtn" class="ghost wide">Preview Effects</button>
+        <div class="joinLine">
+          <input id="roomCode" placeholder="Room code" maxlength="5" />
+          <button id="joinBtn">Join</button>
+        </div>
+        <p id="loginError" class="error"></p>
+      </div>
+    </section>
+
+    <section id="game" class="game hidden">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">Room <span id="code"></span></div>
+          <h2 id="statusTitle">Waiting</h2>
+          <p id="message"></p>
+        </div>
+        <div class="topActions"><button id="soundToggle" class="soundBtn">🔇 Sound</button><button id="nextHandBtn" class="primary hidden">Next Hand</button></div>
+      </header>
+
+      <section id="lobbyPanel" class="lobbyPanel hidden">
+        <div class="lobbyHeader">
+          <div>
+            <h3>Stack setup</h3>
+            <p>Dealer can set each player's chips before the hand starts.</p>
+          </div>
+          <div id="hostStartWrap"></div>
+        </div>
+        <div id="chipControls" class="chipControls"></div>
+      </section>
+
+      <section class="tableWrap">
+        <div class="tableGlow"></div>
+        <div class="pokerTable" id="pokerTable">
+          <div class="centerBoard">
+            <div class="potPill">Pot <span id="pot">0</span></div>
+            <div id="community" class="community"></div>
+            <div id="phasePill" class="phasePill">Lobby</div>
+            <div id="handHint" class="handHint hidden"></div>
+          </div>
+          <div id="players" class="seats"></div>
+        </div>
+      </section>
+
+      <section id="emoteBar" class="emoteBar hidden"></section>
+      <section id="actionPanel" class="actionPanel hidden">
+        <div id="turnText"></div>
+        <div id="actionButtons" class="actionButtons"></div>
+      </section>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/client.js"></script>
+</body>
+</html>
