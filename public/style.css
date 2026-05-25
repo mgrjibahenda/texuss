@@ -2238,3 +2238,16 @@ body {
     letter-spacing: 8px;
   }
 }
+
+
+/* Stable Pro side-pot display */
+.potBreakdown {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(0,0,0,.08);
+  color: rgba(0,0,0,.78);
+  font-size: clamp(13px, 2.4vw, 17px);
+  font-weight: 800;
+  line-height: 1.35;
+}

@@ -1,23 +1,25 @@
-# Texas Hold'em Final Clean
+# Texas Hold'em Stable Pro
 
-## Final Clean 版内容
+这是基于 Final Clean 的规则完善版，重点不是特效，而是真正德州扑克规则稳定。
 
-- 去除复杂 3D / Canvas / 花里胡哨大招特效。
-- 移除背景音乐。
-- 主菜单保留音效开关：Sound On / Sound Off。
-- 保留干净牌型提示和结算特效，避免 display/z-index 问题。
-- Preview Effects 进入独立菜单。
-- Preview Effects 点击 Exit 会移除所有特效和音效，并返回主菜单。
-- 保留 emoji 雨，但只用于破产/预览破产。
-- 玩家破产时座位会塌陷、变灰、显示破产观战。
-- 保留 final winner、断线踢人、破产观战、房间筹码设置等内容。
-- 洗牌使用 Node.js `crypto.randomInt()` + Fisher-Yates，牌型概率和现实一副 52 张牌一致。
+## 规则升级
 
-## 公平性说明
-
-游戏使用一副 52 张牌，每张牌每局只出现一次，洗牌为公平 Fisher-Yates。
-
-人数减少时，桌上参与玩家变少，所以“至少有一个人拿到强牌”的概率会降低。例如 2 人局总体出现强牌的机会低于 6 人局。这不是通过人为调概率实现的，而是自然由真实发牌规则决定。
+- 使用一副 52 张牌。
+- 使用 Node.js `crypto.randomInt()` + Fisher-Yates 洗牌。
+- 没有人为提高好牌概率。
+- 2 人局自然比 6 人局更少出现“有人拿到强牌”的情况，因为参与玩家更少。
+- 修复 heads-up 规则：2 人局 dealer/button 是 small blind，preflop 先行动。
+- Small blind / Big blind 自动轮换。
+- 正确跳过弃牌、all-in、无筹码玩家。
+- all-in 后如果没有人还能行动，会自动发完公共牌进入 showdown。
+- 支持多人 all-in。
+- 支持 side pot 分池。
+- 支持 side pot 中不同玩家争夺不同底池。
+- 支持平分底池，余数筹码按获胜列表顺序分配。
+- 支持弃牌胜利时分池归属。
+- 结算时显示 side pot breakdown。
+- Final Winner 后返回房间可以重新设置破产玩家筹码并开始下一局。
+- 保留干净 UI、音效开关、Preview Effects 独立菜单、破产座位塌陷。
 
 ## Render 设置
 
@@ -33,7 +35,7 @@ Start Command:
 npm start
 ```
 
-上传覆盖 GitHub 仓库根目录的：
+上传覆盖 GitHub 根目录：
 
 ```text
 package.json
@@ -41,3 +43,15 @@ server.js
 README.md
 public
 ```
+
+## 重要说明
+
+这不是赌场软件，也没有เงินจริง功能。它是朋友局虚拟筹码娱乐版。
+
+
+## 14.1 Bugfix
+
+- Fixed missing `openEffectGallery()` function.
+- Fixed missing `stopCanvasCinematic()` / `stopThreeCinematic()` cleanup functions after removing 3D effects.
+- Preview Effects button now opens the independent preview menu correctly.
+- Exiting preview clears effects/sound and returns to main menu.

@@ -260,6 +260,17 @@ const handLines = {
 
 const emotes = ["😂","😭","😎","🤡","💀","🔥","😡","🙏","💸","👑","🍀","😱"];
 
+function stopCanvasCinematic() {
+  const c = document.getElementById("canvasCinematicFx");
+  if (c) c.remove();
+}
+
+function stopThreeCinematic() {
+  const t = document.getElementById("threeCinematicFx");
+  if (t) t.remove();
+}
+
+
 
 const galleryHands = [
   { name: "一对", effect: "onepair", rank: 1, handNameCn: "一对" },
@@ -646,6 +657,9 @@ function showShowdownEffect(winners, busted, finalWinner = null) {
     ? `<div class="cleanBustedText">${busted.map(b => `${escapeHtml(b.name)} 破产观战`).join("<br>")}</div>`
     : "";
   const finalLine = finalWinner ? `<div class="finalLine">${escapeHtml(finalWinner.name)} 最终赢家 · ${finalWinner.chips}</div>` : "";
+  const potBreakdown = (state?.potBreakdown || []).length
+    ? `<div class="potBreakdown">${state.potBreakdown.map(p => `${p.amount}: ${p.winners.join(", ")} (${p.handNameCn})`).join("<br>")}</div>`
+    : "";
 
   playSound("showdown", strongest.rank, busted.length ? "bust" : effect, !!finalWinner);
 
@@ -659,6 +673,7 @@ function showShowdownEffect(winners, busted, finalWinner = null) {
       <div class="showDetails">${winLines}</div>
       ${bustLines}
       ${finalLine}
+      ${potBreakdown}
     </div>
   `;
 
@@ -709,8 +724,81 @@ function bustedEffectHTML() {
   </div>`;
 }
 
+
+function openEffectGallery() {
+  stopAllSounds();
+  removeOverlay("showOverlay");
+  removeOverlay("handOverlay");
+  removeOverlay("previewEffect");
+  removeOverlay("galleryOverlay");
+
+  const login = $("login");
+  const game = $("game");
+  if (login) login.classList.add("hidden");
+  if (game) game.classList.add("hidden");
+
+  const overlay = document.createElement("div");
+  overlay.id = "galleryOverlay";
+  overlay.className = "previewMenu";
+  overlay.innerHTML = `
+    <div class="previewPanel">
+      <h1>Preview Effects</h1>
+      <p>独立牌型预览菜单。退出时会清除所有音效和动画并返回主菜单。</p>
+      <button class="previewExit" id="galleryClose">Exit to Main Menu</button>
+      <div class="previewGrid">
+        ${galleryHands.map(h => `<button class="previewHand" data-effect="${h.effect}" data-rank="${h.rank}" data-name="${h.name}">${h.name}</button>`).join("")}
+      </div>
+      <div class="previewStage" id="previewStage">
+        <div class="previewSeat demoSeat">
+          <div class="seatAvatar">P</div>
+          <div class="seatName">Demo Player</div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  $("galleryClose").onclick = () => {
+    stopAllSounds();
+    removeOverlay("showOverlay");
+    removeOverlay("handOverlay");
+    removeOverlay("previewEffect");
+    removeOverlay("galleryOverlay");
+    if (login) login.classList.remove("hidden");
+  };
+
+  overlay.querySelectorAll("[data-effect]").forEach(btn => {
+    btn.onclick = () => {
+      removeOverlay("previewEffect");
+      const effect = btn.dataset.effect;
+      const rank = Number(btn.dataset.rank);
+      const name = btn.dataset.name;
+      const stage = $("previewStage");
+      if (!stage) return;
+
+      stage.className = `previewStage preview-${effect}`;
+      stage.innerHTML = `
+        <div id="previewEffect" class="previewEffectBox effect-${effect}">
+          ${bigEffectHTML(effect)}
+          <div class="previewEffectText">${effect === "bust" ? "玩家破产 · 座位塌陷" : name}</div>
+        </div>
+        <div class="previewSeat demoSeat ${effect === "bust" ? "seatCollapsed" : ""}">
+          <div class="seatAvatar">${effect === "bust" ? "💀" : "P"}</div>
+          <div class="seatName">Demo Player</div>
+        </div>
+      `;
+
+      if (soundEnabled) {
+        getAudio();
+        playEffectSound(effect, rank, false);
+      }
+    };
+  });
+}
+
+
 function removeOverlay(id) {
-  if (id === "showOverlay") { stopCanvasCinematic(); stopThreeCinematic(); }
+  if (id === "showOverlay") { if (typeof stopCanvasCinematic === "function") stopCanvasCinematic(); if (typeof stopThreeCinematic === "function") stopThreeCinematic(); }
   const old = document.getElementById(id);
   if (old) old.remove();
 }

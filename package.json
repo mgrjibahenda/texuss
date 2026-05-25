@@ -1,7 +1,7 @@
 {
-  "name": "texas-holdem-final-clean",
-  "version": "13.0.0",
-  "description": "Clean online Texas Hold'em with fair crypto shuffle, sound toggle, clean effects, preview menu, busted collapse.",
+  "name": "texas-holdem-stable-pro",
+  "version": "14.1.0",
+  "description": "Stable Texas Hold'em with side pots and preview bugfixes.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

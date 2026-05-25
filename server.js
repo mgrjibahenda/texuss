@@ -89,6 +89,7 @@ function createRoom(hostId, hostName) {
     bigBlind: 20,
     actedThisRound: new Set(),
     winners: [],
+    potBreakdown: [],
     busted: [],
     finalWinner: null,
     handNumber: 0,
@@ -116,6 +117,7 @@ function publicRoom(room, viewerId) {
     smallBlind: room.smallBlind,
     bigBlind: room.bigBlind,
     winners: room.winners,
+    potBreakdown: room.potBreakdown || [],
     busted: room.busted,
     finalWinner: room.finalWinner,
     handNumber: room.handNumber,
@@ -201,6 +203,7 @@ function startHand(room) {
   room.minRaise = room.bigBlind;
   room.actedThisRound = new Set();
   room.winners = [];
+  room.potBreakdown = [];
   room.busted = [];
   room.finalWinner = null;
   room.lastAction = "";
@@ -221,8 +224,23 @@ function startHand(room) {
   }
 
   room.dealerIndex = room.dealerIndex % room.players.length;
-  const sbIndex = nextSeatedWithChips(room, room.dealerIndex);
-  const bbIndex = nextSeatedWithChips(room, sbIndex);
+  if (room.players[room.dealerIndex].chips <= 0) {
+    const nextDealer = nextSeatedWithChips(room, room.dealerIndex);
+    room.dealerIndex = nextDealer < 0 ? 0 : nextDealer;
+  }
+
+  const eligibleCount = room.players.filter(p => p.chips > 0).length;
+  let sbIndex;
+  let bbIndex;
+
+  if (eligibleCount === 2) {
+    // Heads-up rule: dealer/button posts small blind and acts first preflop.
+    sbIndex = room.dealerIndex;
+    bbIndex = nextSeatedWithChips(room, sbIndex);
+  } else {
+    sbIndex = nextSeatedWithChips(room, room.dealerIndex);
+    bbIndex = nextSeatedWithChips(room, sbIndex);
+  }
 
   if (sbIndex < 0 || bbIndex < 0 || sbIndex === bbIndex) {
     room.message = "Need at least 2 players with chips.";
@@ -235,7 +253,9 @@ function startHand(room) {
   takeChips(bb, room.bigBlind);
 
   room.currentBet = Math.max(sb.bet, bb.bet);
-  room.turnIndex = nextIndex(room, bbIndex);
+  room.turnIndex = eligibleCount === 2
+    ? sbIndex
+    : nextIndex(room, bbIndex);
   if (room.turnIndex < 0) room.turnIndex = bbIndex;
 
   room.message = `${sb.name} posts small blind, ${bb.name} posts big blind.`;
@@ -249,10 +269,7 @@ function allBetsMatchedOrAllIn(room) {
 }
 
 function endBettingRound(room) {
-  for (const p of room.players) {
-    room.pot += p.bet;
-    p.bet = 0;
-  }
+  collectOutstandingBets(room);
 
   room.currentBet = 0;
   room.minRaise = room.bigBlind;
@@ -289,50 +306,201 @@ function afterAction(room) {
   else endBettingRound(room);
 }
 
-function finishHand(room) {
+
+function collectOutstandingBets(room) {
   for (const p of room.players) {
-    room.pot += p.bet;
-    p.bet = 0;
-  }
-
-  room.phase = "showdown";
-  const stillIn = room.players.filter(p => !p.folded);
-  let winners = [];
-  let best = null;
-
-  if (stillIn.length === 1) {
-    winners = [stillIn[0]];
-    stillIn[0].lastScore = { name: "Fold Win", cn: "弃牌胜利", rank: -1, effect: "foldwin", tiebreak: [] };
-    room.message = `${stillIn[0].name} wins because everyone else folded.`;
-  } else {
-    for (const p of stillIn) {
-      const score = evaluateSeven([...p.hand, ...room.community]);
-      p.lastScore = score;
-      if (!best || compareScore(score, best) > 0) {
-        best = score;
-        winners = [p];
-      } else if (compareScore(score, best) === 0) {
-        winners.push(p);
-      }
+    if (p.bet > 0) {
+      room.pot += p.bet;
+      p.bet = 0;
     }
-    room.message = `${winners.map(w => w.name).join(", ")} win with ${best.cn}.`;
+  }
+}
+
+function playersInHand(room) {
+  return room.players.filter(p => p.hand && p.hand.length === 2 && p.totalCommitted > 0);
+}
+
+function sidePotEligibility(room, lower, upper) {
+  const contributors = playersInHand(room).filter(p => p.totalCommitted > lower);
+  const eligible = contributors.filter(p => !p.folded && p.totalCommitted >= upper);
+  return { contributors, eligible };
+}
+
+function buildSidePots(room) {
+  const levels = [...new Set(playersInHand(room)
+    .map(p => p.totalCommitted)
+    .filter(v => v > 0))]
+    .sort((a, b) => a - b);
+
+  const pots = [];
+  let lower = 0;
+
+  for (const upper of levels) {
+    const { contributors, eligible } = sidePotEligibility(room, lower, upper);
+    const amount = (upper - lower) * contributors.length;
+
+    if (amount > 0 && eligible.length > 0) {
+      pots.push({
+        amount,
+        lower,
+        upper,
+        eligible
+      });
+    }
+
+    lower = upper;
   }
 
-  const share = Math.floor(room.pot / winners.length);
-  for (const w of winners) w.chips += share;
+  return pots;
+}
 
-  room.winners = winners.map(w => ({
-    id: w.id,
-    name: w.name,
-    amount: share,
-    handName: w.lastScore?.name || "Fold Win",
-    handNameCn: w.lastScore?.cn || "弃牌胜利",
-    effect: w.lastScore?.effect || "foldwin",
-    rank: w.lastScore?.rank ?? -1
+function evaluateRemainingPlayers(room) {
+  for (const p of room.players) {
+    p.lastScore = null;
+  }
+
+  const remaining = room.players.filter(p => !p.folded && p.hand && p.hand.length === 2);
+  if (remaining.length === 1) {
+    remaining[0].lastScore = {
+      name: "Fold Win",
+      cn: "弃牌胜利",
+      rank: -1,
+      effect: "foldwin",
+      tiebreak: []
+    };
+    return;
+  }
+
+  for (const p of remaining) {
+    p.lastScore = evaluateSeven([...p.hand, ...room.community]);
+  }
+}
+
+function winnersForPot(eligible) {
+  let best = null;
+  let winners = [];
+
+  for (const p of eligible) {
+    const score = p.lastScore;
+    if (!score) continue;
+    if (!best || compareScore(score, best) > 0) {
+      best = score;
+      winners = [p];
+    } else if (compareScore(score, best) === 0) {
+      winners.push(p);
+    }
+  }
+
+  return { winners, best };
+}
+
+function awardSidePots(room) {
+  evaluateRemainingPlayers(room);
+
+  const pots = buildSidePots(room);
+  const awardMap = new Map();
+  const potBreakdown = [];
+  let unawarded = 0;
+
+  for (const pot of pots) {
+    const { winners, best } = winnersForPot(pot.eligible);
+
+    if (!winners.length) {
+      unawarded += pot.amount;
+      continue;
+    }
+
+    const share = Math.floor(pot.amount / winners.length);
+    const remainder = pot.amount % winners.length;
+
+    winners.forEach((w, idx) => {
+      const extra = idx < remainder ? 1 : 0;
+      const amount = share + extra;
+      w.chips += amount;
+      awardMap.set(w.id, (awardMap.get(w.id) || 0) + amount);
+    });
+
+    potBreakdown.push({
+      amount: pot.amount,
+      winners: winners.map(w => w.name),
+      handNameCn: best?.cn || "弃牌胜利",
+      eligible: pot.eligible.map(p => p.name)
+    });
+  }
+
+  if (unawarded > 0) {
+    const stillIn = room.players.filter(p => !p.folded);
+    const target = stillIn[0] || room.players[room.dealerIndex] || room.players[0];
+    if (target) {
+      target.chips += unawarded;
+      awardMap.set(target.id, (awardMap.get(target.id) || 0) + unawarded);
+      potBreakdown.push({
+        amount: unawarded,
+        winners: [target.name],
+        handNameCn: "Unawarded chips returned",
+        eligible: [target.name]
+      });
+    }
+  }
+
+  const winners = [...awardMap.entries()]
+    .map(([id, amount]) => {
+      const p = room.players.find(x => x.id === id);
+      return {
+        player: p,
+        amount
+      };
+    })
+    .filter(x => x.player)
+    .sort((a, b) => b.amount - a.amount);
+
+  return { winners, potBreakdown };
+}
+
+function showdownMessage(room, winners) {
+  if (!winners.length) return "No winner.";
+  if (winners.length === 1) {
+    const w = winners[0].player;
+    return `${w.name} wins ${winners[0].amount} with ${w.lastScore?.cn || "弃牌胜利"}.`;
+  }
+  return winners.map(x => `${x.player.name} +${x.amount}`).join(", ");
+}
+
+
+function finishHand(room) {
+  collectOutstandingBets(room);
+  room.phase = "showdown";
+
+  // If everyone except one player folded, side-pot logic still works:
+  // all pots are awarded only to the remaining eligible player(s).
+  const active = room.players.filter(p => !p.folded);
+  if (active.length === 1) {
+    active[0].lastScore = {
+      name: "Fold Win",
+      cn: "弃牌胜利",
+      rank: -1,
+      effect: "foldwin",
+      tiebreak: []
+    };
+  }
+
+  const { winners, potBreakdown } = awardSidePots(room);
+  room.potBreakdown = potBreakdown;
+
+  room.winners = winners.map(({ player, amount }) => ({
+    id: player.id,
+    name: player.name,
+    amount,
+    handName: player.lastScore?.name || "Fold Win",
+    handNameCn: player.lastScore?.cn || "弃牌胜利",
+    effect: player.lastScore?.effect || "foldwin",
+    rank: player.lastScore?.rank ?? -1
   }));
 
+  room.message = showdownMessage(room, winners);
+
   room.busted = room.players
-    .filter(p => p.chips <= 0 && !winners.some(w => w.id === p.id))
+    .filter(p => p.chips <= 0)
     .map(p => ({ id: p.id, name: p.name }));
 
   const survivors = room.players.filter(p => p.chips > 0);
@@ -348,6 +516,9 @@ function finishHand(room) {
   }
 
   room.pot = 0;
+  room.currentBet = 0;
+  room.minRaise = room.bigBlind;
+  room.actedThisRound = new Set();
   room.lastAction = room.finalWinner ? "Final winner decided." : "Showdown complete.";
 
   const nextDealer = nextSeatedWithChips(room, room.dealerIndex);
@@ -472,6 +643,7 @@ function resetHandToLobbyAfterDisconnect(room, disconnectedName) {
   room.phase = "lobby";
   room.actedThisRound = new Set();
   room.winners = [];
+  room.potBreakdown = [];
   room.busted = [];
   room.finalWinner = null;
   room.message = `${disconnectedName} disconnected and was kicked. Hand cancelled. Start a new hand.`;
@@ -604,19 +776,47 @@ io.on("connection", (socket) => {
       amount = Number(amount);
       if (!Number.isFinite(amount)) return;
       const targetBet = Math.floor(amount);
-      const raiseBy = targetBet - room.currentBet;
-      if (targetBet <= room.currentBet || raiseBy < room.minRaise) return;
-      takeChips(player, targetBet - player.bet);
-      room.currentBet = player.bet;
-      room.minRaise = Math.max(room.minRaise, raiseBy);
-      room.actedThisRound = new Set([player.id]);
-      room.lastAction = `${player.name} raises to ${room.currentBet}.`;
-    } else if (type === "allin") {
-      takeChips(player, player.chips);
+      const maxTarget = player.bet + player.chips;
+      if (targetBet <= room.currentBet) return;
+
+      const desiredTarget = Math.min(targetBet, maxTarget);
+      const raiseBy = desiredTarget - room.currentBet;
+      const isAllIn = desiredTarget === maxTarget;
+
+      // A normal raise must meet the minimum raise.
+      // A short all-in raise is allowed, but it does not reopen action.
+      if (raiseBy < room.minRaise && !isAllIn) return;
+
+      takeChips(player, desiredTarget - player.bet);
+
       if (player.bet > room.currentBet) {
-        room.minRaise = Math.max(room.bigBlind, player.bet - room.currentBet);
+        const fullRaise = raiseBy >= room.minRaise;
         room.currentBet = player.bet;
-        room.actedThisRound = new Set([player.id]);
+        if (fullRaise) {
+          room.minRaise = raiseBy;
+          room.actedThisRound = new Set([player.id]);
+        } else {
+          room.actedThisRound.add(player.id);
+        }
+      } else {
+        room.actedThisRound.add(player.id);
+      }
+
+      room.lastAction = `${player.name} ${player.allIn ? "goes all-in to" : "raises to"} ${player.bet}.`;
+    } else if (type === "allin") {
+      const previousBet = room.currentBet;
+      takeChips(player, player.chips);
+
+      if (player.bet > previousBet) {
+        const raiseBy = player.bet - previousBet;
+        const fullRaise = raiseBy >= room.minRaise;
+        room.currentBet = player.bet;
+        if (fullRaise) {
+          room.minRaise = raiseBy;
+          room.actedThisRound = new Set([player.id]);
+        } else {
+          room.actedThisRound.add(player.id);
+        }
       } else {
         room.actedThisRound.add(player.id);
       }
@@ -673,6 +873,7 @@ io.on("connection", (socket) => {
     room.minRaise = room.bigBlind;
     room.actedThisRound = new Set();
     room.winners = [];
+    room.potBreakdown = [];
     room.busted = [];
     room.finalWinner = null;
     room.message = "Back to room. Set stacks, then start a new game.";
