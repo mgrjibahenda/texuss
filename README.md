@@ -89,3 +89,21 @@ npm run test:hands
 - Reduced Socket.IO ping timeout so disconnects are detected faster.
 - Disconnect during a hand still cancels the hand and refunds committed chips to remaining players.
 - Added `npm run test:hardfix` static safety test.
+
+
+## 15.0 Core Fix
+
+这版不是小修补，而是重写了服务器核心行动轮换逻辑。
+
+修复重点：
+
+- 去掉前端/后端 `actionSeq` 依赖，避免按钮明明显示但服务器拒绝。
+- 服务器只以 `turnIndex` + `canAct(player)` 判断当前玩家是否能行动。
+- 2 人局规则：dealer/button = small blind，preflop 先行动。
+- postflop：dealer 左手第一个可行动玩家先行动。
+- all-in 后没人能行动时，自动发满 5 张公共牌再 showdown。
+- 断线时当前手牌取消，已投入筹码返还，房间回 lobby。
+- 前端按钮只短暂锁 250ms，避免卡死。
+- 加入 `npm run test:core-static` 静态核心规则检查。
+
+注意：这仍然是朋友局网页游戏，不是赌场级软件。

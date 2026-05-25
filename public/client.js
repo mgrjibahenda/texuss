@@ -576,12 +576,12 @@ function renderActions() {
 
       const type = btn.dataset.action;
       const amount = Number($("raiseAmount")?.value || 0);
-      socket.emit("action", { type, amount, actionSeq: state?.actionSeq ?? 0 });
+      socket.emit("action", { type, amount });
 
       setTimeout(() => {
         actionSubmitting = false;
         buttons.querySelectorAll("button").forEach(b => b.disabled = false);
-      }, 500);
+      }, 250);
     };
   });
 }

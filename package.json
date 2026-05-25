@@ -1,12 +1,13 @@
 {
-  "name": "texas-holdem-stable-pro",
-  "version": "14.4.0",
-  "description": "Stable Texas Hold'em hard fix: current-turn actions never fail from stale actionSeq; faster disconnect detection.",
+  "name": "texas-holdem-stable-pro-corefix",
+  "version": "15.0.0",
+  "description": "Texas Hold'em Stable Pro with rewritten betting-turn core.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "test:hands": "node tests/hand-evaluator-smoke-test.js",
-    "test:hardfix": "node tests/rule-hardfix-static-test.js"
+    "test:hardfix": "node tests/rule-hardfix-static-test.js",
+    "test:core-static": "node tests/core-static-test.js"
   },
   "dependencies": {
     "express": "^4.18.3",

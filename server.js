@@ -186,12 +186,24 @@ function nextSeatedWithChips(room, fromIndex) {
 
 function nextIndex(room, fromIndex) {
   const n = room.players.length;
+  if (!n) return -1;
   for (let step = 1; step <= n; step++) {
-    const idx = (fromIndex + step) % n;
+    const idx = (((fromIndex ?? -1) + step) % n + n) % n;
     const p = room.players[idx];
-    if (!p.folded && !p.allIn && p.chips > 0) return idx;
+    if (canAct(p)) return idx;
   }
   return -1;
+}
+
+
+
+
+function canAct(player) {
+  return !!player && !player.folded && !player.allIn && player.chips > 0;
+}
+
+function stillInPlayers(room) {
+  return room.players.filter(p => !p.folded && p.hand && p.hand.length === 2);
 }
 
 function activePlayers(room) {
@@ -199,8 +211,10 @@ function activePlayers(room) {
 }
 
 function playersAbleToAct(room) {
-  return room.players.filter(p => !p.folded && !p.allIn && p.chips > 0);
+  return room.players.filter(canAct);
 }
+
+
 
 function takeChips(player, amount) {
   const actual = Math.max(0, Math.min(player.chips, amount));
@@ -224,7 +238,7 @@ function startHand(room) {
   room.deck = makeDeck();
   room.community = [];
   room.pot = 0;
-  room.currentBet = room.bigBlind;
+  room.currentBet = 0;
   room.minRaise = room.bigBlind;
   room.actedThisRound = new Set();
   room.winners = [];
@@ -241,6 +255,13 @@ function startHand(room) {
     p.folded = p.chips <= 0;
     p.allIn = false;
     p.lastScore = null;
+    p.lastActionAt = 0;
+  }
+
+  // Move dealer button to a player who has chips.
+  if (room.dealerIndex < 0 || room.dealerIndex >= room.players.length || room.players[room.dealerIndex].chips <= 0) {
+    const nextDealer = nextSeatedWithChips(room, room.dealerIndex);
+    room.dealerIndex = nextDealer < 0 ? 0 : nextDealer;
   }
 
   for (let r = 0; r < 2; r++) {
@@ -249,18 +270,12 @@ function startHand(room) {
     }
   }
 
-  room.dealerIndex = room.dealerIndex % room.players.length;
-  if (room.players[room.dealerIndex].chips <= 0) {
-    const nextDealer = nextSeatedWithChips(room, room.dealerIndex);
-    room.dealerIndex = nextDealer < 0 ? 0 : nextDealer;
-  }
-
   const eligibleCount = room.players.filter(p => p.chips > 0).length;
   let sbIndex;
   let bbIndex;
 
   if (eligibleCount === 2) {
-    // Heads-up rule: dealer/button posts small blind and acts first preflop.
+    // Heads-up: dealer/button is small blind and acts first preflop.
     sbIndex = room.dealerIndex;
     bbIndex = nextSeatedWithChips(room, sbIndex);
   } else {
@@ -275,24 +290,36 @@ function startHand(room) {
 
   const sb = room.players[sbIndex];
   const bb = room.players[bbIndex];
-  takeChips(sb, room.smallBlind);
-  takeChips(bb, room.bigBlind);
+  const sbPaid = takeChips(sb, room.smallBlind);
+  const bbPaid = takeChips(bb, room.bigBlind);
 
   room.currentBet = Math.max(sb.bet, bb.bet);
-  room.turnIndex = eligibleCount === 2
-    ? sbIndex
-    : nextIndex(room, bbIndex);
-  if (room.turnIndex < 0) room.turnIndex = bbIndex;
+  room.minRaise = room.bigBlind;
 
-  room.message = `${sb.name} posts small blind, ${bb.name} posts big blind.`;
+  // Preflop action:
+  // 2 players: small blind/dealer acts first.
+  // 3+ players: first live player left of big blind acts first.
+  room.turnIndex = eligibleCount === 2 ? sbIndex : nextIndex(room, bbIndex);
+  if (room.turnIndex < 0) return runOutBoardAndFinish(room);
+
+  room.message = `${sb.name} posts small blind (${sbPaid}), ${bb.name} posts big blind (${bbPaid}).`;
   room.lastAction = `Hand ${room.handNumber} begins.`;
 }
+
+
 
 function allBetsMatchedOrAllIn(room) {
   const able = playersAbleToAct(room);
   if (able.length === 0) return true;
-  return able.every(p => p.bet === room.currentBet && room.actedThisRound.has(p.id));
+
+  for (const p of able) {
+    if (p.bet < room.currentBet) return false;
+    if (!room.actedThisRound.has(p.id)) return false;
+  }
+  return true;
 }
+
+
 
 
 function dealNextStreet(room) {
@@ -332,45 +359,53 @@ function runOutBoardAndFinish(room) {
 function endBettingRound(room) {
   collectOutstandingBets(room);
 
-  room.currentBet = 0;
-  room.minRaise = room.bigBlind;
-  room.actedThisRound = new Set();
-
   if (activePlayers(room).length <= 1) return finishHand(room);
 
   if (room.phase === "river") {
     return finishHand(room);
   }
 
+  room.currentBet = 0;
+  room.minRaise = room.bigBlind;
+  room.actedThisRound = new Set();
+
   dealNextStreet(room);
   room.message = room.lastAction;
   room.actionSeq = (room.actionSeq || 0) + 1;
 
-  // Critical all-in rule:
-  // If every remaining player is all-in, there is no more betting.
-  // The board must run out to 5 cards before showdown.
+  // If all remaining players are all-in, deal to river and finish.
   if (playersAbleToAct(room).length === 0) {
     return runOutBoardAndFinish(room);
   }
 
+  // Postflop: first live player left of dealer/button acts first.
   room.turnIndex = nextIndex(room, room.dealerIndex);
   if (room.turnIndex < 0) return runOutBoardAndFinish(room);
 }
 
+
+
 function afterAction(room) {
   if (activePlayers(room).length <= 1) return finishHand(room);
 
-  // If nobody can make any more betting decision, run the board out.
   if (playersAbleToAct(room).length === 0) {
     return runOutBoardAndFinish(room);
   }
 
-  if (allBetsMatchedOrAllIn(room)) return endBettingRound(room);
+  if (allBetsMatchedOrAllIn(room)) {
+    return endBettingRound(room);
+  }
 
   const next = nextIndex(room, room.turnIndex);
-  if (next >= 0) room.turnIndex = next;
-  else runOutBoardAndFinish(room);
+  if (next >= 0) {
+    room.turnIndex = next;
+    return;
+  }
+
+  return runOutBoardAndFinish(room);
 }
+
+
 
 function finishHand(room) {
   collectOutstandingBets(room);
@@ -657,58 +692,64 @@ io.on("connection", (socket) => {
     emitRoom(room);
   });
 
-  socket.on("action", ({ type, amount, actionSeq }) => {
+  
+socket.on("action", ({ type, amount }) => {
     const found = findPlayerRoom(socket.id);
     if (!found) return;
-    const { room, player } = found;
-    if (room.phase === "lobby" || room.phase === "showdown") return;
-    if (room.players[room.turnIndex]?.id !== socket.id) return;
-    if (player.folded || player.allIn) return;
 
-    // The server turn check above is the real authority.
-    // Do NOT reject a valid current-turn action only because the browser has an older actionSeq.
-    // That caused valid buttons to appear dead after another player acted.
+    const { room, player } = found;
+    if (["lobby", "showdown"].includes(room.phase)) return;
+    if (room.players[room.turnIndex]?.id !== socket.id) return;
+    if (!canAct(player)) return;
+
     const now = Date.now();
-    if (player.lastActionAt && now - player.lastActionAt < 120) return;
+    if (player.lastActionAt && now - player.lastActionAt < 80) return;
 
     const callAmount = Math.max(0, room.currentBet - player.bet);
-    let acceptedAction = false;
+    let accepted = false;
 
     if (type === "fold") {
       player.folded = true;
       room.actedThisRound.add(player.id);
       room.lastAction = `${player.name} folds.`;
-      acceptedAction = true;
-    } else if (type === "check") {
+      accepted = true;
+    }
+
+    else if (type === "check") {
       if (callAmount !== 0) return;
       room.actedThisRound.add(player.id);
       room.lastAction = `${player.name} checks.`;
-      acceptedAction = true;
-    } else if (type === "call") {
+      accepted = true;
+    }
+
+    else if (type === "call") {
       const paid = takeChips(player, callAmount);
       room.actedThisRound.add(player.id);
       room.lastAction = `${player.name} calls ${paid}.`;
-      acceptedAction = true;
-    } else if (type === "raise") {
-      amount = Number(amount);
+      accepted = true;
+    }
+
+    else if (type === "raise") {
+      amount = Math.floor(Number(amount));
       if (!Number.isFinite(amount)) return;
-      const targetBet = Math.floor(amount);
+
       const maxTarget = player.bet + player.chips;
+      const targetBet = Math.min(amount, maxTarget);
       if (targetBet <= room.currentBet) return;
 
-      const desiredTarget = Math.min(targetBet, maxTarget);
-      const raiseBy = desiredTarget - room.currentBet;
-      const isAllIn = desiredTarget === maxTarget;
+      const raiseBy = targetBet - room.currentBet;
+      const isAllIn = targetBet === maxTarget;
 
-      // A normal raise must meet the minimum raise.
-      // A short all-in raise is allowed, but it does not reopen action.
+      // Normal raises must meet minimum raise.
+      // Short all-in raises are allowed but do not reopen action.
       if (raiseBy < room.minRaise && !isAllIn) return;
 
-      takeChips(player, desiredTarget - player.bet);
+      takeChips(player, targetBet - player.bet);
 
       if (player.bet > room.currentBet) {
         const fullRaise = raiseBy >= room.minRaise;
         room.currentBet = player.bet;
+
         if (fullRaise) {
           room.minRaise = raiseBy;
           room.actedThisRound = new Set([player.id]);
@@ -720,8 +761,10 @@ io.on("connection", (socket) => {
       }
 
       room.lastAction = `${player.name} ${player.allIn ? "goes all-in to" : "raises to"} ${player.bet}.`;
-      acceptedAction = true;
-    } else if (type === "allin") {
+      accepted = true;
+    }
+
+    else if (type === "allin") {
       const previousBet = room.currentBet;
       takeChips(player, player.chips);
 
@@ -729,6 +772,7 @@ io.on("connection", (socket) => {
         const raiseBy = player.bet - previousBet;
         const fullRaise = raiseBy >= room.minRaise;
         room.currentBet = player.bet;
+
         if (fullRaise) {
           room.minRaise = raiseBy;
           room.actedThisRound = new Set([player.id]);
@@ -738,11 +782,13 @@ io.on("connection", (socket) => {
       } else {
         room.actedThisRound.add(player.id);
       }
+
       room.lastAction = `${player.name} goes all-in.`;
-      acceptedAction = true;
+      accepted = true;
     }
 
-    if (!acceptedAction) return;
+    if (!accepted) return;
+
     player.lastActionAt = now;
     room.message = room.lastAction;
     room.actionSeq = (room.actionSeq || 0) + 1;
@@ -807,6 +853,7 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     const found = findPlayerRoom(socket.id);
     if (!found) return;
+
     const { room, player } = found;
     const wasInHand = !["lobby", "showdown"].includes(room.phase);
     const disconnectedName = player.name;
@@ -820,7 +867,6 @@ io.on("connection", (socket) => {
 
     if (room.hostId === socket.id) {
       room.hostId = room.players[0].id;
-      room.dealerIndex = 0;
     }
 
     if (room.dealerIndex >= room.players.length) room.dealerIndex = 0;
