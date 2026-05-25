@@ -2253,118 +2253,125 @@ body {
 }
 
 
-/* v16 Debug + History */
-.debugPanel,
-.historyPanel {
-  width: min(1180px, 96vw);
-  margin: 12px auto;
-  padding: 14px;
-  border-radius: 22px;
-  background: rgba(0,0,0,.36);
-  border: 1px solid rgba(255,255,255,.14);
-  color: rgba(255,255,255,.92);
+/* v17 playable fix: server-driven buttons + emoji always clickable */
+.actionPanel {
+  position: fixed !important;
+  left: 50% !important;
+  bottom: 78px !important;
+  transform: translateX(-50%) !important;
+  width: min(820px, 96vw) !important;
+  z-index: 12000 !important;
+  pointer-events: auto !important;
+  padding: 12px !important;
+  border-radius: 22px !important;
+  background: rgba(0,0,0,.74) !important;
 }
 
-.panelTitle {
-  font-size: 18px;
+.actionButtons {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)) !important;
+  gap: 10px !important;
+}
+
+.bigAction,
+.disabledAction {
+  min-height: 52px !important;
+  padding: 10px 12px !important;
+  border-radius: 16px !important;
+  font-size: 15px !important;
+  font-weight: 1000 !important;
+  white-space: normal !important;
+}
+
+.disabledAction {
+  opacity: .78 !important;
+  background: rgba(255,255,255,.14) !important;
+  color: rgba(255,255,255,.9) !important;
+}
+
+.allInBtn {
+  background: linear-gradient(135deg, #ff5b5b, #ffd15c) !important;
+  color: #18100a !important;
+}
+
+.clearRaiseGroup {
+  display: grid !important;
+  grid-template-columns: 1fr auto !important;
+  grid-column: 1 / -1 !important;
+  gap: 8px !important;
+}
+
+.clearRaiseGroup input {
+  min-height: 52px !important;
+  border-radius: 16px !important;
+}
+
+.emoteBar {
+  position: fixed !important;
+  left: 50% !important;
+  bottom: 8px !important;
+  transform: translateX(-50%) !important;
+  z-index: 13000 !important;
+  pointer-events: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  max-width: 96vw !important;
+  overflow-x: auto !important;
+  padding: 8px 10px !important;
+  border-radius: 22px !important;
+  background: rgba(0,0,0,.82) !important;
+}
+
+.emoteLabel {
+  font-size: 12px;
   font-weight: 1000;
-  margin-bottom: 10px;
-}
-
-.debugGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 8px;
-}
-
-.debugGrid > div,
-.debugPlayer,
-.historyItem {
-  padding: 8px 10px;
-  border-radius: 14px;
-  background: rgba(255,255,255,.08);
-}
-
-.debugGrid b,
-.debugGrid span,
-.debugPlayer span {
-  display: block;
-}
-
-.debugGrid b {
-  font-size: 11px;
-  opacity: .62;
-  text-transform: uppercase;
-}
-
-.debugPlayers {
-  margin-top: 10px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 8px;
-}
-
-.debugPlayer b {
-  display: block;
-  margin-bottom: 4px;
-}
-
-.debugPlayer span {
-  font-size: 12px;
-  opacity: .82;
-}
-
-.historyList {
-  max-height: 260px;
-  overflow: auto;
-  display: grid;
-  gap: 6px;
-}
-
-.historyItem {
-  font-size: 13px;
-  line-height: 1.3;
-}
-
-.historyItem span {
-  margin-right: 8px;
-  opacity: .55;
-  font-weight: 900;
-}
-
-.history-private {
   opacity: .75;
+  padding: 0 4px;
+  flex: 0 0 auto;
 }
 
-.dangerBtn {
-  margin-top: 10px;
-  background: #ff5b5b !important;
-  color: #fff !important;
+.emoteBtn {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 50% !important;
+  font-size: 22px !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
 }
 
-.blindEditor {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
+.emoteBubble {
+  z-index: 14000 !important;
+  pointer-events: none !important;
 }
 
-.blindEditor input {
-  width: 90px;
+.tableWrap {
+  padding-bottom: 170px !important;
 }
 
-.hostMiniControls {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
+@media (max-width: 760px) {
+  .actionPanel {
+    bottom: 72px !important;
+    width: 98vw !important;
+  }
+  .actionButtons {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .clearRaiseGroup {
+    grid-template-columns: 1fr !important;
+  }
 }
 
-.hostMiniControls button {
-  padding: 7px 9px;
-  border-radius: 10px;
-  font-size: 12px;
-}
 
-#actionPanel {
-  min-height: 76px;
+/* v17.1 No Preview: preview effects removed */
+#galleryBtn,
+.previewMenu,
+.previewPanel,
+.previewGrid,
+.previewHand,
+.previewStage,
+.previewEffectBox,
+.previewEffectText {
+  display: none !important;
 }

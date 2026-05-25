@@ -126,119 +126,54 @@ function createRoom(hostId, hostName) {
 }
 
 
-function ensureRoomLogs(room) {
-  if (!room.history) room.history = [];
-  if (!room.debugEvents) room.debugEvents = [];
-}
+function playerActionState(room, player) {
+  if (!player) {
+    return {
+      canAct: false,
+      reason: "You are not in this room.",
+      callAmount: 0,
+      minRaiseTo: 0,
+      currentPlayerName: room.players[room.turnIndex]?.name || ""
+    };
+  }
 
-function cardText(card) {
-  if (!card) return "";
-  return (card.rank === "T" ? "10" : card.rank) + card.suit;
-}
+  const currentPlayer = room.players[room.turnIndex];
+  const callAmount = Math.max(0, room.currentBet - player.bet);
+  const minRaiseTo = Math.max(room.currentBet + room.minRaise, player.bet + callAmount + room.minRaise);
 
-function logHistory(room, text, type = "info") {
-  ensureRoomLogs(room);
-  const entry = {
-    id: Date.now() + "-" + crypto.randomInt(1000000),
-    handNumber: room.handNumber || 0,
-    phase: room.phase,
-    type,
-    text,
-    ts: Date.now()
-  };
-  room.history.push(entry);
-  room.history = room.history.slice(-160);
-  return entry;
-}
+  if (room.phase === "lobby") {
+    return { canAct: false, reason: "等待开始", callAmount, minRaiseTo, currentPlayerName: currentPlayer?.name || "" };
+  }
+  if (room.phase === "showdown") {
+    return { canAct: false, reason: "本局结束", callAmount, minRaiseTo, currentPlayerName: currentPlayer?.name || "" };
+  }
+  if (player.folded) {
+    return { canAct: false, reason: "你已弃牌", callAmount, minRaiseTo, currentPlayerName: currentPlayer?.name || "" };
+  }
+  if (player.allIn) {
+    return { canAct: false, reason: "你已经 All-in，等待开牌", callAmount, minRaiseTo, currentPlayerName: currentPlayer?.name || "" };
+  }
+  if (player.chips <= 0) {
+    return { canAct: false, reason: "你没有筹码", callAmount, minRaiseTo, currentPlayerName: currentPlayer?.name || "" };
+  }
+  if (!currentPlayer || currentPlayer.id !== player.id) {
+    return {
+      canAct: false,
+      reason: `等待 ${currentPlayer?.name || "其他玩家"} 行动`,
+      callAmount,
+      minRaiseTo,
+      currentPlayerName: currentPlayer?.name || ""
+    };
+  }
 
-function logDebug(room, text, data = null) {
-  ensureRoomLogs(room);
-  const entry = {
-    id: Date.now() + "-" + crypto.randomInt(1000000),
-    phase: room.phase,
-    text,
-    data,
-    ts: Date.now()
-  };
-  room.debugEvents.push(entry);
-  room.debugEvents = room.debugEvents.slice(-120);
-  return entry;
-}
-
-function buildDebugState(room) {
-  const current = room.players[room.turnIndex];
   return {
-    phase: room.phase,
-    handNumber: room.handNumber,
-    dealerIndex: room.dealerIndex,
-    dealerName: room.players[room.dealerIndex]?.name || null,
-    turnIndex: room.turnIndex,
-    turnName: current?.name || null,
-    pot: room.pot,
-    currentBet: room.currentBet,
-    minRaise: room.minRaise,
-    communityCount: room.community.length,
-    actedThisRound: Array.from(room.actedThisRound || []),
-    ableToAct: playersAbleToAct(room).map(p => p.name),
-    activePlayers: activePlayers(room).map(p => p.name),
-    players: room.players.map((p, idx) => ({
-      seat: idx,
-      name: p.name,
-      chips: p.chips,
-      bet: p.bet,
-      totalCommitted: p.totalCommitted,
-      folded: p.folded,
-      allIn: p.allIn,
-      canAct: canAct(p),
-      hasActed: room.actedThisRound?.has(p.id) || false,
-      connected: p.connected !== false
-    }))
+    canAct: true,
+    reason: "轮到你行动",
+    callAmount,
+    minRaiseTo,
+    currentPlayerName: currentPlayer?.name || ""
   };
 }
-
-function actionBlockedReason(room, player) {
-  if (!player) return "You are not in this room.";
-  if (room.phase === "lobby") return "Waiting in lobby.";
-  if (room.phase === "showdown") return "Hand is over.";
-  if (player.folded) return "You folded.";
-  if (player.allIn) return "You are all-in.";
-  if (player.chips <= 0) return "You have no chips.";
-  if (room.players[room.turnIndex]?.id !== player.id) {
-    return `Not your turn. Waiting for ${room.players[room.turnIndex]?.name || "another player"}.`;
-  }
-  return "Your turn.";
-}
-
-function cancelHand(room, reason = "Hand cancelled.") {
-  for (const p of room.players) {
-    if (p.totalCommitted) p.chips += p.totalCommitted;
-    p.bet = 0;
-    p.totalCommitted = 0;
-    p.hand = [];
-    p.folded = p.chips <= 0;
-    p.allIn = false;
-    p.lastScore = null;
-    p.lastActionAt = 0;
-  }
-  room.started = false;
-  room.deck = [];
-  room.community = [];
-  room.pot = 0;
-  room.currentBet = 0;
-  room.minRaise = room.bigBlind;
-  room.phase = "lobby";
-  room.actedThisRound = new Set();
-  room.winners = [];
-  room.potBreakdown = [];
-  room.busted = [];
-  room.finalWinner = null;
-  room.message = reason;
-  room.lastAction = reason;
-  room.actionSeq = (room.actionSeq || 0) + 1;
-  logHistory(room, reason, "cancel");
-  logDebug(room, "Hand cancelled", { reason });
-}
-
 
 function publicRoom(room, viewerId) {
   return {
@@ -262,9 +197,6 @@ function publicRoom(room, viewerId) {
     handNumber: room.handNumber,
     lastAction: room.lastAction,
     actionSeq: room.actionSeq || 0,
-    history: room.history || [],
-    debugEvents: room.debugEvents || [],
-    debugState: buildDebugState(room),
     emotes: room.emotes || [],
     players: room.players.map((p, idx) => ({
       id: p.id,
@@ -282,7 +214,8 @@ function publicRoom(room, viewerId) {
       isYou: p.id === viewerId,
       currentScore: p.id === viewerId && !p.folded && p.hand.length === 2 && room.community.length >= 3 && room.phase !== "showdown"
         ? displayPersonalScore(p.hand, room.community)
-        : null
+        : null,
+      actionState: p.id === viewerId ? playerActionState(room, p) : null
     }))
   };
 }
@@ -422,9 +355,6 @@ function startHand(room) {
 
   room.message = `${sb.name} posts small blind (${sbPaid}), ${bb.name} posts big blind (${bbPaid}).`;
   room.lastAction = `Hand ${room.handNumber} begins.`;
-  logHistory(room, `Hand #${room.handNumber} begins. Dealer: ${room.players[room.dealerIndex]?.name || "-"}, SB: ${sb.name} (${sbPaid}), BB: ${bb.name} (${bbPaid}).`, "start");
-  logHistory(room, `${sb.name}: ${sb.hand.map(cardText).join(" ")} | ${bb.name}: ${bb.hand.map(cardText).join(" ")}`, "private");
-  logDebug(room, "Hand started", buildDebugState(room));
 }
 
 
@@ -448,7 +378,6 @@ function dealNextStreet(room) {
     room.phase = "flop";
     while (room.community.length < 3) room.community.push(room.deck.pop());
     room.lastAction = "Flop dealt.";
-    logHistory(room, `Flop: ${room.community.map(cardText).join(" ")}`, "deal");
     return true;
   }
 
@@ -456,7 +385,6 @@ function dealNextStreet(room) {
     room.phase = "turn";
     while (room.community.length < 4) room.community.push(room.deck.pop());
     room.lastAction = "Turn dealt.";
-    logHistory(room, `Turn: ${cardText(room.community[3])} | Board: ${room.community.map(cardText).join(" ")}`, "deal");
     return true;
   }
 
@@ -464,7 +392,6 @@ function dealNextStreet(room) {
     room.phase = "river";
     while (room.community.length < 5) room.community.push(room.deck.pop());
     room.lastAction = "River dealt.";
-    logHistory(room, `River: ${cardText(room.community[4])} | Board: ${room.community.map(cardText).join(" ")}`, "deal");
     return true;
   }
 
@@ -562,13 +489,6 @@ function finishHand(room) {
   }));
 
   room.message = showdownMessage(room, winners);
-  logHistory(room, `Showdown: ${room.message}`, "showdown");
-  for (const p of room.players.filter(x => x.hand && x.hand.length === 2)) {
-    logHistory(room, `${p.name}: ${p.hand.map(cardText).join(" ")}${p.lastScore ? " → " + p.lastScore.cn : ""}`, "showdown");
-  }
-  if (potBreakdown.length) {
-    logHistory(room, `Pot breakdown: ${potBreakdown.map(p => `${p.amount} to ${p.winners.join(", ")} (${p.handNameCn})`).join(" | ")}`, "showdown");
-  }
 
   room.busted = room.players
     .filter(p => p.chips <= 0)
@@ -582,7 +502,6 @@ function finishHand(room) {
       chips: survivors[0].chips
     };
     room.message = `${survivors[0].name} is the final winner.`;
-    logHistory(room, room.message, "final");
   } else {
     room.finalWinner = null;
   }
@@ -698,10 +617,31 @@ function findPlayerRoom(socketId) {
 
 
 function resetHandToLobbyAfterDisconnect(room, disconnectedName) {
-  cancelHand(room, `${disconnectedName} disconnected and was kicked. Hand cancelled. Start a new hand.`);
+  for (const p of room.players) {
+    if (p.totalCommitted) p.chips += p.totalCommitted;
+    p.bet = 0;
+    p.totalCommitted = 0;
+    p.hand = [];
+    p.folded = p.chips <= 0;
+    p.allIn = false;
+    p.lastScore = null;
+  }
+  room.started = false;
+  room.deck = [];
+  room.community = [];
+  room.pot = 0;
+  room.currentBet = 0;
+  room.minRaise = room.bigBlind;
+  room.phase = "lobby";
+  room.actedThisRound = new Set();
+  room.winners = [];
+  room.potBreakdown = [];
+  room.busted = [];
+  room.finalWinner = null;
+  room.message = `${disconnectedName} disconnected and was kicked. Hand cancelled. Start a new hand.`;
+  room.lastAction = "Player disconnected. Hand cancelled.";
+  room.actionSeq = (room.actionSeq || 0) + 1;
 }
-
-
 
 io.on("connection", (socket) => {
   socket.on("createRoom", ({ name }, cb) => {
@@ -761,7 +701,6 @@ io.on("connection", (socket) => {
     room.currentBet = 0;
     room.message = `${p.name}'s stack set to ${amount}.`;
     room.lastAction = "Stack updated.";
-    logHistory(room, `${p.name} stack set to ${amount}.`, "host");
     emitRoom(room);
   });
 
@@ -791,7 +730,6 @@ io.on("connection", (socket) => {
     room.currentBet = 0;
     room.message = `Everyone's stack set to ${amount}.`;
     room.lastAction = "All stacks updated.";
-    logHistory(room, `Everyone stack set to ${amount}.`, "host");
     emitRoom(room);
   });
 
@@ -811,18 +749,14 @@ socket.on("action", ({ type, amount }) => {
     if (!found) return;
 
     const { room, player } = found;
-    const reason = actionBlockedReason(room, player);
-    if (reason !== "Your turn.") {
-      socket.emit("actionRejected", { reason });
-      logDebug(room, `Action rejected for ${player?.name || socket.id}: ${reason}`, { type });
+    const actionState = playerActionState(room, player);
+    if (!actionState.canAct) {
+      socket.emit("actionRejected", { reason: actionState.reason });
       return;
     }
 
     const now = Date.now();
-    if (player.lastActionAt && now - player.lastActionAt < 80) {
-      socket.emit("actionRejected", { reason: "Duplicate click ignored." });
-      return;
-    }
+    if (player.lastActionAt && now - player.lastActionAt < 80) return;
 
     const callAmount = Math.max(0, room.currentBet - player.bet);
     let accepted = false;
@@ -910,106 +844,8 @@ socket.on("action", ({ type, amount }) => {
 
     player.lastActionAt = now;
     room.message = room.lastAction;
-    logHistory(room, room.lastAction, "action");
     room.actionSeq = (room.actionSeq || 0) + 1;
     afterAction(room);
-    logDebug(room, "After action", buildDebugState(room));
-    emitRoom(room);
-  });
-
-
-
-  socket.on("cancelHand", () => {
-    const found = findPlayerRoom(socket.id);
-    if (!found) return;
-    const { room } = found;
-    if (room.hostId !== socket.id) return;
-    if (["lobby", "showdown"].includes(room.phase)) return;
-    cancelHand(room, "Host cancelled the current hand. Committed chips were returned.");
-    emitRoom(room);
-  });
-
-  socket.on("kickPlayer", ({ playerId }) => {
-    const found = findPlayerRoom(socket.id);
-    if (!found) return;
-    const { room } = found;
-    if (room.hostId !== socket.id) return;
-    if (playerId === socket.id) return;
-
-    const idx = room.players.findIndex(p => p.id === playerId);
-    if (idx < 0) return;
-    const kicked = room.players[idx];
-
-    const targetSocket = io.sockets.sockets.get(playerId);
-    if (targetSocket) {
-      targetSocket.emit("kicked", { reason: "Host kicked you from the room." });
-      targetSocket.leave(room.code);
-    }
-
-    room.players.splice(idx, 1);
-
-    if (room.players.length === 0) {
-      rooms.delete(room.code);
-      return;
-    }
-
-    if (!["lobby", "showdown"].includes(room.phase)) {
-      cancelHand(room, `${kicked.name} was kicked. Hand cancelled and chips returned.`);
-    } else {
-      room.message = `${kicked.name} was kicked.`;
-      room.lastAction = room.message;
-      room.actionSeq = (room.actionSeq || 0) + 1;
-      logHistory(room, room.message, "host");
-    }
-
-    if (room.dealerIndex >= room.players.length) room.dealerIndex = 0;
-    if (room.turnIndex >= room.players.length) room.turnIndex = 0;
-    emitRoom(room);
-  });
-
-  socket.on("setDealer", ({ playerId }) => {
-    const found = findPlayerRoom(socket.id);
-    if (!found) return;
-    const { room } = found;
-    if (room.hostId !== socket.id || room.phase !== "lobby") return;
-    const idx = room.players.findIndex(p => p.id === playerId && p.chips > 0);
-    if (idx < 0) return;
-    room.dealerIndex = idx;
-    room.message = `Dealer set to ${room.players[idx].name}.`;
-    room.lastAction = room.message;
-    room.actionSeq = (room.actionSeq || 0) + 1;
-    logHistory(room, room.message, "host");
-    emitRoom(room);
-  });
-
-  socket.on("setBlinds", ({ smallBlind, bigBlind }) => {
-    const found = findPlayerRoom(socket.id);
-    if (!found) return;
-    const { room } = found;
-    if (room.hostId !== socket.id || room.phase !== "lobby") return;
-    const sb = Math.max(1, Math.min(99999, Math.floor(Number(smallBlind))));
-    const bb = Math.max(sb, Math.min(99999, Math.floor(Number(bigBlind))));
-    if (!Number.isFinite(sb) || !Number.isFinite(bb)) return;
-    room.smallBlind = sb;
-    room.bigBlind = bb;
-    room.minRaise = bb;
-    room.message = `Blinds set to ${sb}/${bb}.`;
-    room.lastAction = room.message;
-    room.actionSeq = (room.actionSeq || 0) + 1;
-    logHistory(room, room.message, "host");
-    emitRoom(room);
-  });
-
-  socket.on("clearHistory", () => {
-    const found = findPlayerRoom(socket.id);
-    if (!found) return;
-    const { room } = found;
-    if (room.hostId !== socket.id) return;
-    room.history = [];
-    room.debugEvents = [];
-    room.message = "History and debug log cleared.";
-    room.lastAction = room.message;
-    room.actionSeq = (room.actionSeq || 0) + 1;
     emitRoom(room);
   });
 
@@ -1063,7 +899,6 @@ socket.on("action", ({ type, amount }) => {
     room.finalWinner = null;
     room.message = "Back to room. Set stacks, then start a new game.";
     room.lastAction = "Returned to lobby.";
-    logHistory(room, "Returned to lobby after final winner.", "host");
     room.actionSeq = (room.actionSeq || 0) + 1;
     emitRoom(room);
   });

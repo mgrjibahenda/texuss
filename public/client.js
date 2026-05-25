@@ -272,21 +272,6 @@ function stopThreeCinematic() {
 }
 
 
-
-const galleryHands = [
-  { name: "一对", effect: "onepair", rank: 1, handNameCn: "一对" },
-  { name: "两对", effect: "twopair", rank: 2, handNameCn: "两对" },
-  { name: "三条", effect: "threekind", rank: 3, handNameCn: "三条" },
-  { name: "顺子", effect: "straight", rank: 4, handNameCn: "顺子" },
-  { name: "同花", effect: "flush", rank: 5, handNameCn: "同花" },
-  { name: "葫芦", effect: "fullhouse", rank: 6, handNameCn: "葫芦" },
-  { name: "四条", effect: "fourkind", rank: 7, handNameCn: "四条" },
-  { name: "同花顺", effect: "straightflush", rank: 8, handNameCn: "同花顺" },
-  { name: "皇家同花顺", effect: "royal", rank: 9, handNameCn: "皇家同花顺" },
-  { name: "破产特效", effect: "bust", rank: 0, handNameCn: "破产" }
-];
-
-
 $("createBtn").onclick = () => {
   const name = $("name").value.trim() || "Player";
   socket.emit("createRoom", { name }, handleJoinResponse);
@@ -301,11 +286,6 @@ $("joinBtn").onclick = () => {
 $("nextHandBtn").onclick = () => {
   if (state?.finalWinner) socket.emit("returnToLobbyAfterFinal");
   else socket.emit("startHand");
-};
-
-
-$("galleryBtn").onclick = () => {
-  openEffectGallery();
 };
 
 
@@ -384,7 +364,6 @@ function render() {
   renderPersonalHandHint();
   renderActions();
   renderEmotes();
-  renderDebugAndHistory(isHost);
   spawnIncomingEmotes();
   playStateSounds();
 
@@ -445,26 +424,11 @@ function renderLobby(isHost) {
   panel.classList.toggle("hidden", state.phase !== "lobby");
   if (state.phase !== "lobby") return;
 
-  hostWrap.innerHTML = isHost ? `
-    <button class="primary" id="startHandNow">Start Hand</button>
-    <button id="clearHistoryBtn">Clear Logs</button>
-    <div class="blindEditor">
-      <input id="smallBlindInput" type="number" value="${state.smallBlind}" min="1" />
-      <input id="bigBlindInput" type="number" value="${state.bigBlind}" min="1" />
-      <button id="setBlindsBtn">Set Blinds</button>
-    </div>
-  ` : "";
+  hostWrap.innerHTML = isHost ? `<button class="primary" id="startHandNow">Start Hand</button>` : "";
   if (isHost) {
     setTimeout(() => {
       const btn = $("startHandNow");
       if (btn) btn.onclick = () => socket.emit("startHand");
-      const clear = $("clearHistoryBtn");
-      if (clear) clear.onclick = () => socket.emit("clearHistory");
-      const blinds = $("setBlindsBtn");
-      if (blinds) blinds.onclick = () => socket.emit("setBlinds", {
-        smallBlind: $("smallBlindInput").value,
-        bigBlind: $("bigBlindInput").value
-      });
     }, 0);
   }
 
@@ -475,12 +439,8 @@ function renderLobby(isHost) {
 
   const playerCards = state.players.map(p => `
     <div class="chipCard">
-      <label>${escapeHtml(p.name)} ${state.players[state.dealerIndex]?.id === p.id ? "· Dealer" : ""}</label>
+      <label>${escapeHtml(p.name)}</label>
       <input data-chip-player="${p.id}" value="${p.chips}" type="number" min="0" step="10" />
-      <div class="hostMiniControls">
-        <button data-dealer-player="${p.id}">Set Dealer</button>
-        ${p.id !== socket.id ? `<button data-kick-player="${p.id}">Kick</button>` : ""}
-      </div>
     </div>
   `).join("");
 
@@ -575,108 +535,51 @@ function renderPersonalHandHint() {
   }
 }
 
-
-function actionReason(me) {
-  if (!state) return "Waiting for server.";
-  if (!me) return "You are not in this room.";
-  if (state.phase === "lobby") return "Waiting in lobby.";
-  if (state.phase === "showdown") return "Hand is over.";
-  if (me.folded) return "You folded.";
-  if (me.allIn) return "You are all-in. Waiting for showdown.";
-  if (me.chips <= 0) return "You have no chips.";
-  const current = state.players[state.turnIndex];
-  if (!current) return "Waiting for server.";
-  if (current.id !== me.id) return `Not your turn. Waiting for ${current.name}.`;
-  return "Your turn.";
-}
-
-function renderDebugAndHistory(isHost) {
-  const debug = $("debugPanel");
-  const history = $("historyPanel");
-  if (!debug || !history || !state) return;
-
-  const d = state.debugState || {};
-  const hostControls = isHost && !["lobby", "showdown"].includes(state.phase)
-    ? `<button id="cancelHandBtn" class="dangerBtn">Cancel Hand</button>`
-    : "";
-
-  debug.classList.toggle("hidden", !isHost);
-  history.classList.toggle("hidden", false);
-
-  debug.innerHTML = isHost ? `
-    <div class="panelTitle">Host Debug Panel</div>
-    <div class="debugGrid">
-      <div><b>Phase</b><span>${escapeHtml(d.phase)}</span></div>
-      <div><b>Turn</b><span>${escapeHtml(d.turnName || "-")}</span></div>
-      <div><b>Dealer</b><span>${escapeHtml(d.dealerName || "-")}</span></div>
-      <div><b>Pot</b><span>${d.pot ?? 0}</span></div>
-      <div><b>Current Bet</b><span>${d.currentBet ?? 0}</span></div>
-      <div><b>Min Raise</b><span>${d.minRaise ?? 0}</span></div>
-      <div><b>Board Cards</b><span>${d.communityCount ?? 0}</span></div>
-      <div><b>Able</b><span>${(d.ableToAct || []).map(escapeHtml).join(", ") || "-"}</span></div>
-    </div>
-    ${hostControls}
-    <div class="debugPlayers">
-      ${(d.players || []).map(p => `
-        <div class="debugPlayer">
-          <b>${p.seat}. ${escapeHtml(p.name)}</b>
-          <span>chips ${p.chips} · bet ${p.bet} · committed ${p.totalCommitted}</span>
-          <span>${p.folded ? "folded" : "live"} · ${p.allIn ? "all-in" : "not all-in"} · ${p.canAct ? "can act" : "cannot act"} · ${p.hasActed ? "acted" : "not acted"}</span>
-        </div>
-      `).join("")}
-    </div>
-  ` : "";
-
-  const hist = (state.history || []).slice(-28).reverse();
-  history.innerHTML = `
-    <div class="panelTitle">Hand History</div>
-    <div class="historyList">
-      ${hist.length ? hist.map(h => `<div class="historyItem history-${h.type}"><span>#${h.handNumber} ${escapeHtml(h.phase)}</span>${escapeHtml(h.text)}</div>`).join("") : "<div class='historyItem'>No history yet.</div>"}
-    </div>
-  `;
-
-  const cancel = $("cancelHandBtn");
-  if (cancel) cancel.onclick = () => {
-    if (confirm("Cancel current hand and return committed chips?")) socket.emit("cancelHand");
-  };
-}
-
-
 function renderActions() {
   const panel = $("actionPanel");
   const buttons = $("actionButtons");
   const me = state.players.find(p => p.isYou);
-  const isMyTurn = me && state.players[state.turnIndex]?.id === me.id && !["lobby", "showdown"].includes(state.phase);
+  const a = me?.actionState || {
+    canAct: false,
+    reason: "等待服务器",
+    callAmount: 0,
+    minRaiseTo: 0,
+    currentPlayerName: ""
+  };
 
-  if (isMyTurn) actionSubmitting = false;
-  panel.classList.toggle("hidden", false);
-  if (!isMyTurn) {
-    const reason = actionReason(me);
-    $("turnText").textContent = reason;
-    buttons.innerHTML = "";
+  panel.classList.remove("hidden");
+  $("turnText").textContent = a.canAct
+    ? `轮到你行动 · 跟注 ${a.callAmount} · 你的筹码 ${me.chips}`
+    : a.reason;
+
+  if (!a.canAct) {
+    actionSubmitting = false;
+    buttons.innerHTML = `<button class="disabledAction" disabled>${escapeHtml(a.reason)}</button>`;
     return;
   }
 
-  const callAmount = Math.max(0, state.currentBet - me.bet);
-  $("turnText").textContent = `Your turn. To call: ${callAmount}. Stack: ${me.chips}.`;
+  actionSubmitting = false;
 
   const possible = [];
-  if (callAmount === 0) possible.push(`<button data-action="check" class="primary">Check</button>`);
-  if (callAmount > 0) possible.push(`<button data-action="call" class="primary">Call ${callAmount}</button>`);
-  possible.push(`<button data-action="fold">Fold</button>`);
-  possible.push(`<button data-action="allin">All-in</button>`);
+  if (a.callAmount === 0) possible.push(`<button data-action="check" class="primary bigAction">Check / 过牌</button>`);
+  if (a.callAmount > 0) possible.push(`<button data-action="call" class="primary bigAction">Call / 跟注 ${a.callAmount}</button>`);
+  possible.push(`<button data-action="fold" class="bigAction">Fold / 弃牌</button>`);
+  possible.push(`<button data-action="allin" class="bigAction allInBtn">All-in / 全下</button>`);
   possible.push(`
-    <div class="raiseGroup">
-      <input id="raiseAmount" type="number" min="${state.currentBet + state.minRaise}" step="10" placeholder="Raise to ${state.currentBet + state.minRaise}+" />
-      <button data-action="raise">Raise</button>
+    <div class="raiseGroup clearRaiseGroup">
+      <input id="raiseAmount" type="number" min="${a.minRaiseTo}" step="10" placeholder="加注到 ${a.minRaiseTo}+" />
+      <button data-action="raise" class="bigAction">Raise / 加注</button>
     </div>
   `);
 
   buttons.innerHTML = possible.join("");
 
   buttons.querySelectorAll("[data-action]").forEach(btn => {
-    btn.onclick = () => {
+    btn.onclick = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
       if (actionSubmitting) return;
+
       actionSubmitting = true;
       buttons.querySelectorAll("button").forEach(b => b.disabled = true);
 
@@ -692,14 +595,30 @@ function renderActions() {
   });
 }
 
+
+
 function renderEmotes() {
   const bar = $("emoteBar");
-  bar.classList.toggle("hidden", !state);
-  bar.innerHTML = emotes.map(e => `<button class="emoteBtn" data-emote="${e}">${e}</button>`).join("");
+  if (!bar) return;
+  bar.classList.remove("hidden");
+  bar.innerHTML = `
+    <div class="emoteLabel">Emoji</div>
+    ${emotes.map(e => `<button type="button" class="emoteBtn" data-emote="${e}">${e}</button>`).join("")}
+  `;
+
   bar.querySelectorAll("[data-emote]").forEach(btn => {
-    btn.onclick = () => { playSound("emote"); socket.emit("sendEmote", { emoji: btn.dataset.emote }); };
+    btn.onclick = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!state) return;
+      playSound("emote");
+      socket.emit("sendEmote", { emoji: btn.dataset.emote });
+      spawnEmoteBubble(btn.dataset.emote, "You");
+    };
   });
 }
+
+
 
 function spawnIncomingEmotes() {
   if (!state || !state.emotes) return;
@@ -843,76 +762,8 @@ function bustedEffectHTML() {
 }
 
 
-function openEffectGallery() {
-  stopAllSounds();
-  removeOverlay("showOverlay");
-  removeOverlay("handOverlay");
-  removeOverlay("previewEffect");
-  removeOverlay("galleryOverlay");
 
-  const login = $("login");
-  const game = $("game");
-  if (login) login.classList.add("hidden");
-  if (game) game.classList.add("hidden");
 
-  const overlay = document.createElement("div");
-  overlay.id = "galleryOverlay";
-  overlay.className = "previewMenu";
-  overlay.innerHTML = `
-    <div class="previewPanel">
-      <h1>Preview Effects</h1>
-      <p>独立牌型预览菜单。退出时会清除所有音效和动画并返回主菜单。</p>
-      <button class="previewExit" id="galleryClose">Exit to Main Menu</button>
-      <div class="previewGrid">
-        ${galleryHands.map(h => `<button class="previewHand" data-effect="${h.effect}" data-rank="${h.rank}" data-name="${h.name}">${h.name}</button>`).join("")}
-      </div>
-      <div class="previewStage" id="previewStage">
-        <div class="previewSeat demoSeat">
-          <div class="seatAvatar">P</div>
-          <div class="seatName">Demo Player</div>
-        </div>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-
-  $("galleryClose").onclick = () => {
-    stopAllSounds();
-    removeOverlay("showOverlay");
-    removeOverlay("handOverlay");
-    removeOverlay("previewEffect");
-    removeOverlay("galleryOverlay");
-    if (login) login.classList.remove("hidden");
-  };
-
-  overlay.querySelectorAll("[data-effect]").forEach(btn => {
-    btn.onclick = () => {
-      removeOverlay("previewEffect");
-      const effect = btn.dataset.effect;
-      const rank = Number(btn.dataset.rank);
-      const name = btn.dataset.name;
-      const stage = $("previewStage");
-      if (!stage) return;
-
-      stage.className = `previewStage preview-${effect}`;
-      stage.innerHTML = `
-        <div id="previewEffect" class="previewEffectBox effect-${effect}">
-          ${bigEffectHTML(effect)}
-          <div class="previewEffectText">${effect === "bust" ? "玩家破产 · 座位塌陷" : name}</div>
-        </div>
-        <div class="previewSeat demoSeat ${effect === "bust" ? "seatCollapsed" : ""}">
-          <div class="seatAvatar">${effect === "bust" ? "💀" : "P"}</div>
-          <div class="seatName">Demo Player</div>
-        </div>
-      `;
-
-      if (soundEnabled) {
-        getAudio();
-        playEffectSound(effect, rank, false);
-      }
-    };
-  });
-}
 
 
 function removeOverlay(id) {

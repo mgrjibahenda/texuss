@@ -109,47 +109,38 @@ npm run test:hands
 注意：这仍然是朋友局网页游戏，不是赌场级软件。
 
 
-## v16 Debug + Test Edition
+## v17 Playable Fix
 
-新增内容：
+这版目标只有一个：让游戏能玩。
 
-- 房主 Debug Panel：
-  - phase
-  - turnIndex / 当前行动玩家
-  - dealer
-  - pot / currentBet / minRaise
-  - 公共牌数量
-  - ableToAct
-  - 每个玩家 chips / bet / totalCommitted / folded / allIn / actedThisRound / canAct
+核心改动：
 
-- Hand History：
-  - 每手开始
-  - blinds
-  - actions
-  - flop / turn / river
-  - showdown
-  - side pot breakdown
-  - final winner
-  - host 操作
+- 按钮显示改成服务器驱动：
+  - 服务器给每个玩家返回 `actionState`
+  - 前端不再自己猜是不是轮到你
+  - dealer 行动后，下一个玩家的按钮应该由服务器直接给出
+- 行动按钮改成大号中英双语按钮。
+- 非你行动时，按钮区明确显示等待谁。
+- emoji 栏固定到底部，z-index 提高，点击时 stopPropagation，避免被牌桌/按钮遮挡。
+- 保留 v15 的规则核心：heads-up、side pot、all-in runout、断线取消手牌。
 
-- 房主控制：
-  - Cancel Hand：取消当前手牌并返还 committed chips
-  - Kick player
-  - Set Dealer
-  - Set Blinds
-  - Clear Logs
+测试：
 
-- 前端操作原因提示：
-  - Not your turn
-  - You folded
-  - You are all-in
-  - Hand is over
-  - Waiting in lobby
-  - Server rejected action reason
-
-- 测试：
 ```bash
-npm run test:v16
+npm run test:v17
 npm run test:core-static
 npm run test:hands
 ```
+
+
+## v17.1 No Preview
+
+- Removed Preview Effects button from the main menu.
+- Removed Preview Effects click handler and preview menu function.
+- Kept all actual gameplay code unchanged:
+  - server-driven action buttons
+  - fair shuffle
+  - side pot
+  - all-in board runout
+  - emoji system
+  - sound toggle
