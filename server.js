@@ -89,6 +89,7 @@ function createRoom(hostId, hostName) {
     actedThisRound: new Set(),
     winners: [],
     busted: [],
+    finalWinner: null,
     handNumber: 0,
     lastAction: "",
     emotes: []
@@ -115,6 +116,7 @@ function publicRoom(room, viewerId) {
     bigBlind: room.bigBlind,
     winners: room.winners,
     busted: room.busted,
+    finalWinner: room.finalWinner,
     handNumber: room.handNumber,
     lastAction: room.lastAction,
     emotes: room.emotes || [],
@@ -199,6 +201,7 @@ function startHand(room) {
   room.actedThisRound = new Set();
   room.winners = [];
   room.busted = [];
+  room.finalWinner = null;
   room.lastAction = "";
 
   for (const p of room.players) {
@@ -331,8 +334,20 @@ function finishHand(room) {
     .filter(p => p.chips <= 0 && !winners.some(w => w.id === p.id))
     .map(p => ({ id: p.id, name: p.name }));
 
+  const survivors = room.players.filter(p => p.chips > 0);
+  if (survivors.length === 1 && room.players.length > 1) {
+    room.finalWinner = {
+      id: survivors[0].id,
+      name: survivors[0].name,
+      chips: survivors[0].chips
+    };
+    room.message = `${survivors[0].name} is the final winner.`;
+  } else {
+    room.finalWinner = null;
+  }
+
   room.pot = 0;
-  room.lastAction = "Showdown complete.";
+  room.lastAction = room.finalWinner ? "Final winner decided." : "Showdown complete.";
 
   const nextDealer = nextSeatedWithChips(room, room.dealerIndex);
   room.dealerIndex = nextDealer < 0 ? 0 : nextDealer;
@@ -434,6 +449,32 @@ function findPlayerRoom(socketId) {
     if (p) return { room, player: p };
   }
   return null;
+}
+
+
+function resetHandToLobbyAfterDisconnect(room, disconnectedName) {
+  for (const p of room.players) {
+    if (p.totalCommitted) p.chips += p.totalCommitted;
+    p.bet = 0;
+    p.totalCommitted = 0;
+    p.hand = [];
+    p.folded = p.chips <= 0;
+    p.allIn = false;
+    p.lastScore = null;
+  }
+  room.started = false;
+  room.deck = [];
+  room.community = [];
+  room.pot = 0;
+  room.currentBet = 0;
+  room.minRaise = room.bigBlind;
+  room.phase = "lobby";
+  room.actedThisRound = new Set();
+  room.winners = [];
+  room.busted = [];
+  room.finalWinner = null;
+  room.message = `${disconnectedName} disconnected and was kicked. Hand cancelled. Start a new hand.`;
+  room.lastAction = "Player disconnected. Hand cancelled.";
 }
 
 io.on("connection", (socket) => {
@@ -581,12 +622,63 @@ io.on("connection", (socket) => {
     emitRoom(room);
   });
 
+
+  socket.on("returnToLobbyAfterFinal", () => {
+    const found = findPlayerRoom(socket.id);
+    if (!found) return;
+    const { room } = found;
+    if (room.hostId !== socket.id || !room.finalWinner) return;
+    for (const p of room.players) {
+      p.hand = [];
+      p.bet = 0;
+      p.totalCommitted = 0;
+      p.folded = p.chips <= 0;
+      p.allIn = false;
+      p.lastScore = null;
+    }
+    room.started = false;
+    room.phase = "lobby";
+    room.deck = [];
+    room.community = [];
+    room.pot = 0;
+    room.currentBet = 0;
+    room.winners = [];
+    room.busted = [];
+    room.finalWinner = null;
+    room.message = "Back to room. Dealer can reset stacks for another game.";
+    room.lastAction = "Returned to lobby.";
+    emitRoom(room);
+  });
+
   socket.on("disconnect", () => {
     const found = findPlayerRoom(socket.id);
     if (!found) return;
     const { room, player } = found;
-    player.connected = false;
-    room.message = `${player.name} disconnected.`;
+    const wasInHand = !["lobby", "showdown"].includes(room.phase);
+    const disconnectedName = player.name;
+    const idx = room.players.findIndex(p => p.id === socket.id);
+    if (idx >= 0) room.players.splice(idx, 1);
+
+    if (room.players.length === 0) {
+      rooms.delete(room.code);
+      return;
+    }
+
+    if (room.hostId === socket.id) {
+      room.hostId = room.players[0].id;
+      room.dealerIndex = 0;
+    }
+
+    if (room.dealerIndex >= room.players.length) room.dealerIndex = 0;
+    if (room.turnIndex >= room.players.length) room.turnIndex = 0;
+
+    if (wasInHand) {
+      resetHandToLobbyAfterDisconnect(room, disconnectedName);
+    } else {
+      room.message = `${disconnectedName} disconnected and was kicked.`;
+      room.players.forEach((p, i) => { p.seat = i; });
+    }
+
     emitRoom(room);
   });
 });
