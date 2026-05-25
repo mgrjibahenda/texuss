@@ -1,0 +1,16 @@
+{
+  "name": "texas-holdem-v4-premium-plus",
+  "version": "4.1.0",
+  "description": "Polished private Texas Hold'em friend room with circular table, stack controls, hand alerts, and hand-specific effects.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.3",
+    "socket.io": "^4.7.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
