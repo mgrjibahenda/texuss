@@ -1,7 +1,7 @@
 {
-  "name": "texas-holdem-v17-1-no-preview",
-  "version": "17.1.0",
-  "description": "Playable Texas Hold'em with Preview Effects removed safely.",
+  "name": "texas-holdem-final-optimized-emotes",
+  "version": "18.0.0",
+  "description": "Final optimized playable Texas Hold'em with safe emotes.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -9,7 +9,8 @@
     "test:hardfix": "node tests/rule-hardfix-static-test.js",
     "test:core-static": "node tests/core-static-test.js",
     "test:v17": "node tests/v17-playable-test.js",
-    "test:no-preview": "node tests/no-preview-test.js"
+    "test:no-preview": "node tests/no-preview-test.js",
+    "test:final": "node tests/final-optimized-test.js"
   },
   "dependencies": {
     "express": "^4.18.3",

@@ -458,6 +458,123 @@ function afterAction(room) {
 
 
 
+
+function playersInHand(room) {
+  return room.players.filter(p => p.hand && p.hand.length === 2 && p.totalCommitted > 0);
+}
+
+function buildSidePots(room) {
+  const levels = [...new Set(playersInHand(room)
+    .map(p => p.totalCommitted)
+    .filter(v => v > 0))]
+    .sort((a, b) => a - b);
+
+  const pots = [];
+  let lower = 0;
+
+  for (const upper of levels) {
+    const contributors = playersInHand(room).filter(p => p.totalCommitted > lower);
+    const eligible = contributors.filter(p => !p.folded && p.totalCommitted >= upper);
+    const amount = (upper - lower) * contributors.length;
+
+    if (amount > 0 && eligible.length > 0) {
+      pots.push({ amount, lower, upper, eligible });
+    }
+
+    lower = upper;
+  }
+
+  return pots;
+}
+
+function evaluateRemainingPlayers(room) {
+  for (const p of room.players) p.lastScore = null;
+
+  const remaining = room.players.filter(p => !p.folded && p.hand && p.hand.length === 2);
+  if (remaining.length === 1) {
+    remaining[0].lastScore = {
+      name: "Fold Win",
+      cn: "弃牌胜利",
+      rank: -1,
+      effect: "foldwin",
+      tiebreak: []
+    };
+    return;
+  }
+
+  for (const p of remaining) {
+    p.lastScore = evaluateSeven([...p.hand, ...room.community]);
+  }
+}
+
+function winnersForPot(eligible) {
+  let best = null;
+  let winners = [];
+
+  for (const p of eligible) {
+    const score = p.lastScore;
+    if (!score) continue;
+
+    if (!best || compareScore(score, best) > 0) {
+      best = score;
+      winners = [p];
+    } else if (compareScore(score, best) === 0) {
+      winners.push(p);
+    }
+  }
+
+  return { winners, best };
+}
+
+function awardSidePots(room) {
+  evaluateRemainingPlayers(room);
+
+  const pots = buildSidePots(room);
+  const awardMap = new Map();
+  const potBreakdown = [];
+
+  for (const pot of pots) {
+    const { winners, best } = winnersForPot(pot.eligible);
+    if (!winners.length) continue;
+
+    const share = Math.floor(pot.amount / winners.length);
+    const remainder = pot.amount % winners.length;
+
+    winners.forEach((w, idx) => {
+      const amount = share + (idx < remainder ? 1 : 0);
+      w.chips += amount;
+      awardMap.set(w.id, (awardMap.get(w.id) || 0) + amount);
+    });
+
+    potBreakdown.push({
+      amount: pot.amount,
+      winners: winners.map(w => w.name),
+      handNameCn: best?.cn || "弃牌胜利",
+      eligible: pot.eligible.map(p => p.name)
+    });
+  }
+
+  const winners = [...awardMap.entries()]
+    .map(([id, amount]) => {
+      const player = room.players.find(p => p.id === id);
+      return { player, amount };
+    })
+    .filter(x => x.player)
+    .sort((a, b) => b.amount - a.amount);
+
+  return { winners, potBreakdown };
+}
+
+function showdownMessage(room, winners) {
+  if (!winners.length) return "No winner.";
+  if (winners.length === 1) {
+    const w = winners[0].player;
+    return `${w.name} wins ${winners[0].amount} with ${w.lastScore?.cn || "弃牌胜利"}.`;
+  }
+  return winners.map(x => `${x.player.name} +${x.amount}`).join(", ");
+}
+
+
 function finishHand(room) {
   collectOutstandingBets(room);
   room.phase = "showdown";
@@ -858,7 +975,7 @@ socket.on("action", ({ type, amount }) => {
     if (!allowed.includes(emoji)) return;
     if (!room.emotes) room.emotes = [];
     room.emotes.push({
-      id: Date.now() + "-" + Math.random().toString(16).slice(2),
+      id: Date.now() + "-" + crypto.randomInt(1000000),
       playerId: player.id,
       name: player.name,
       emoji,

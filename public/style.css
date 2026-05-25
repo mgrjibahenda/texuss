@@ -2375,3 +2375,125 @@ body {
 .previewEffectText {
   display: none !important;
 }
+
+
+/* Final optimized: playable buttons + safe compact emotes */
+.actionPanel {
+  position: fixed !important;
+  left: 50% !important;
+  bottom: 82px !important;
+  transform: translateX(-50%) !important;
+  width: min(820px, 96vw) !important;
+  z-index: 12000 !important;
+  pointer-events: auto !important;
+  padding: 12px !important;
+  border-radius: 22px !important;
+  background: rgba(0,0,0,.76) !important;
+  backdrop-filter: blur(14px) !important;
+}
+
+.actionButtons {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)) !important;
+  gap: 10px !important;
+}
+
+.bigAction,
+.disabledAction {
+  min-height: 52px !important;
+  padding: 10px 12px !important;
+  border-radius: 16px !important;
+  font-size: 15px !important;
+  font-weight: 1000 !important;
+  white-space: normal !important;
+}
+
+.disabledAction {
+  opacity: .78 !important;
+  background: rgba(255,255,255,.14) !important;
+  color: rgba(255,255,255,.9) !important;
+}
+
+.allInBtn {
+  background: linear-gradient(135deg, #ff5b5b, #ffd15c) !important;
+  color: #18100a !important;
+}
+
+.clearRaiseGroup {
+  display: grid !important;
+  grid-template-columns: 1fr auto !important;
+  grid-column: 1 / -1 !important;
+  gap: 8px !important;
+}
+
+.clearRaiseGroup input {
+  min-height: 52px !important;
+  border-radius: 16px !important;
+}
+
+.emoteBar {
+  position: fixed !important;
+  right: 12px !important;
+  bottom: 12px !important;
+  left: auto !important;
+  transform: none !important;
+  z-index: 13000 !important;
+  pointer-events: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  max-width: min(390px, 46vw) !important;
+  overflow-x: auto !important;
+  padding: 7px 8px !important;
+  border-radius: 999px !important;
+  background: rgba(0,0,0,.82) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+.emoteLabel {
+  font-size: 11px;
+  font-weight: 1000;
+  opacity: .7;
+  padding: 0 3px;
+  flex: 0 0 auto;
+}
+
+.emoteBtn {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  border-radius: 50% !important;
+  font-size: 18px !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+  padding: 0 !important;
+}
+
+.emoteBubble {
+  z-index: 14000 !important;
+  pointer-events: none !important;
+}
+
+.tableWrap {
+  padding-bottom: 170px !important;
+}
+
+@media (max-width: 760px) {
+  .actionPanel {
+    bottom: 96px !important;
+    width: 98vw !important;
+  }
+  .actionButtons {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .clearRaiseGroup {
+    grid-template-columns: 1fr !important;
+  }
+  .emoteBar {
+    left: 50% !important;
+    right: auto !important;
+    bottom: 8px !important;
+    transform: translateX(-50%) !important;
+    max-width: 96vw !important;
+  }
+}

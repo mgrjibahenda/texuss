@@ -561,8 +561,12 @@ function renderActions() {
   actionSubmitting = false;
 
   const possible = [];
-  if (a.callAmount === 0) possible.push(`<button data-action="check" class="primary bigAction">Check / 过牌</button>`);
-  if (a.callAmount > 0) possible.push(`<button data-action="call" class="primary bigAction">Call / 跟注 ${a.callAmount}</button>`);
+  if (a.callAmount === 0) {
+    possible.push(`<button data-action="check" class="primary bigAction">Check / 过牌</button>`);
+  }
+  if (a.callAmount > 0) {
+    possible.push(`<button data-action="call" class="primary bigAction">Call / 跟注 ${a.callAmount}</button>`);
+  }
   possible.push(`<button data-action="fold" class="bigAction">Fold / 弃牌</button>`);
   possible.push(`<button data-action="allin" class="bigAction allInBtn">All-in / 全下</button>`);
   possible.push(`
@@ -597,6 +601,8 @@ function renderActions() {
 
 
 
+
+
 function renderEmotes() {
   const bar = $("emoteBar");
   if (!bar) return;
@@ -620,24 +626,30 @@ function renderEmotes() {
 
 
 
+
+
 function spawnIncomingEmotes() {
   if (!state || !state.emotes) return;
   state.emotes.forEach(em => {
     if (seenEmoteIds.has(em.id)) return;
     seenEmoteIds.add(em.id);
-    spawnEmoteBubble(em.emoji, em.name);
+    if (em.playerId !== socket.id) spawnEmoteBubble(em.emoji, em.name);
   });
 }
+
+
 
 function spawnEmoteBubble(emoji, name) {
   const bubble = document.createElement("div");
   bubble.className = "emoteBubble";
   bubble.innerHTML = `<span>${emoji}</span><small>${escapeHtml(name)}</small>`;
   bubble.style.left = `${12 + Math.random() * 76}%`;
-  bubble.style.top = `${62 + Math.random() * 20}%`;
+  bubble.style.top = `${52 + Math.random() * 20}%`;
   document.body.appendChild(bubble);
-  setTimeout(() => bubble.remove(), 2500);
+  setTimeout(() => bubble.remove(), 2200);
 }
+
+
 
 function cardEl(c) {
   const div = document.createElement("div");

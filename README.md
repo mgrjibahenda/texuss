@@ -144,3 +144,30 @@ npm run test:hands
   - all-in board runout
   - emoji system
   - sound toggle
+
+
+## v18 Final Optimized with Safe Emotes
+
+Final optimization goals:
+
+- Keep emoji/emote system.
+- Move emoji bar away from the main action buttons on desktop.
+- On mobile, action buttons stay above emoji bar.
+- Emoji clicks use `stopPropagation()` and high z-index.
+- Preview Effects remains removed.
+- Keep server-driven action buttons from v17.
+- Keep real Hold'em rule fixes:
+  - heads-up button/small blind
+  - side pots
+  - all-in runout to 5 community cards
+  - board-only hand hint fix
+  - disconnect cancels hand and refunds committed chips
+
+Run checks:
+
+```bash
+npm run test:final
+npm run test:v17
+npm run test:core-static
+npm run test:hands
+```
