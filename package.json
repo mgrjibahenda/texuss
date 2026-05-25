@@ -1,0 +1,16 @@
+{
+  "name": "texas-holdem-v7-effects-fix",
+  "version": "7.0.0",
+  "description": "Texas Hold'em v7 with clearer effects, visible emote dock, cleaner showdown text, and fixed table visibility.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.3",
+    "socket.io": "^4.7.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
