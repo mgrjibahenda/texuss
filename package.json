@@ -1,10 +1,11 @@
 {
   "name": "texas-holdem-stable-pro",
-  "version": "14.1.0",
-  "description": "Stable Texas Hold'em with side pots and preview bugfixes.",
+  "version": "14.3.0",
+  "description": "Stable Texas Hold'em rule fixes: all-in board runout and anti-duplicate actions.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test:hands": "node tests/hand-evaluator-smoke-test.js"
   },
   "dependencies": {
     "express": "^4.18.3",

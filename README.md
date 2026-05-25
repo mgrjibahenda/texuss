@@ -55,3 +55,27 @@ public
 - Fixed missing `stopCanvasCinematic()` / `stopThreeCinematic()` cleanup functions after removing 3D effects.
 - Preview Effects button now opens the independent preview menu correctly.
 - Exiting preview clears effects/sound and returns to main menu.
+
+
+## 14.2 Hand Hint Fix
+
+- Fixed the private `你开出了...` hint.
+- Board-only hands no longer trigger fake personal hints.
+  - Example: board has a pair, but your hole cards do not improve it → no `你开出了一对`.
+- The hint now only appears when your hole cards improve the board-only hand.
+- The personal made-hand badge is forced to display only on your own seat.
+- Added optional local smoke test:
+
+```bash
+npm run test:hands
+```
+
+
+## 14.3 Rule Fix
+
+- Fixed full-table all-in only dealing the flop.
+- If all remaining players are all-in, the server now automatically runs out flop/turn/river to 5 public cards before showdown.
+- Added server-side `actionSeq` to reject stale/double-click actions.
+- Added short per-player duplicate action guard.
+- Client now sends `actionSeq` and temporarily disables action buttons after a click.
+- This targets the bug where one player could appear to check twice because an old click was accepted after the street advanced.

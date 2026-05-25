@@ -1,6 +1,7 @@
 const socket = io();
 
 let state = null;
+let actionSubmitting = false;
 let lastShowdownKey = "";
 let lastPersonalScoreKey = "";
 let seenEmoteIds = new Set();
@@ -526,6 +527,7 @@ function renderPersonalHandHint() {
   const me = state.players.find(p => p.isYou);
   if (!me || !me.currentScore || me.folded || me.currentScore.rank < 1 || state.phase === "showdown") {
     hint.classList.add("hidden");
+    lastPersonalScoreKey = "";
     return;
   }
 
@@ -567,9 +569,18 @@ function renderActions() {
 
   buttons.querySelectorAll("[data-action]").forEach(btn => {
     btn.onclick = () => {
+      if (actionSubmitting) return;
+      actionSubmitting = true;
+      buttons.querySelectorAll("button").forEach(b => b.disabled = true);
+
       const type = btn.dataset.action;
       const amount = Number($("raiseAmount")?.value || 0);
-      socket.emit("action", { type, amount });
+      socket.emit("action", { type, amount, actionSeq: state?.actionSeq ?? 0 });
+
+      setTimeout(() => {
+        actionSubmitting = false;
+        buttons.querySelectorAll("button").forEach(b => b.disabled = false);
+      }, 500);
     };
   });
 }

@@ -44,6 +44,26 @@ function displayScore(score) {
   };
 }
 
+
+function displayPersonalScore(holeCards, communityCards) {
+  // This is only for the private "你开出了..." hint.
+  // It deliberately does NOT count board-only hands.
+  // Example: if the board is 7♠ 7♥ A♦, everyone technically has one pair,
+  // but we should not tell every player "you made a pair".
+  if (!holeCards || holeCards.length !== 2 || !communityCards || communityCards.length < 3) return null;
+
+  const actual = evaluateSeven([...holeCards, ...communityCards]);
+  const boardOnly = evaluateSeven(communityCards);
+
+  // Only show a made-hand hint if the player's hole cards improve the board-only hand.
+  // Same hand category with only better kicker is not enough for a flashy "you made X" message.
+  if (!actual || actual.rank < 1) return null;
+  if (actual.rank <= boardOnly.rank) return null;
+
+  return displayScore(actual);
+}
+
+
 function makeDeck() {
   const deck = [];
   for (const suit of SUITS) {
@@ -94,6 +114,7 @@ function createRoom(hostId, hostName) {
     finalWinner: null,
     handNumber: 0,
     lastAction: "",
+    actionSeq: 0,
     emotes: []
   };
 
@@ -122,6 +143,7 @@ function publicRoom(room, viewerId) {
     finalWinner: room.finalWinner,
     handNumber: room.handNumber,
     lastAction: room.lastAction,
+    actionSeq: room.actionSeq || 0,
     emotes: room.emotes || [],
     players: room.players.map((p, idx) => ({
       id: p.id,
@@ -137,8 +159,8 @@ function publicRoom(room, viewerId) {
       connected: p.connected,
       seat: idx,
       isYou: p.id === viewerId,
-      currentScore: p.id === viewerId && !p.folded && p.hand.length === 2 && room.community.length >= 3
-        ? displayScore(evaluateSeven([...p.hand, ...room.community]))
+      currentScore: p.id === viewerId && !p.folded && p.hand.length === 2 && room.community.length >= 3 && room.phase !== "showdown"
+        ? displayPersonalScore(p.hand, room.community)
         : null
     }))
   };
@@ -207,6 +229,7 @@ function startHand(room) {
   room.busted = [];
   room.finalWinner = null;
   room.lastAction = "";
+  room.actionSeq = (room.actionSeq || 0) + 1;
 
   for (const p of room.players) {
     p.hand = [];
@@ -268,6 +291,41 @@ function allBetsMatchedOrAllIn(room) {
   return able.every(p => p.bet === room.currentBet && room.actedThisRound.has(p.id));
 }
 
+
+function dealNextStreet(room) {
+  if (room.phase === "preflop") {
+    room.phase = "flop";
+    while (room.community.length < 3) room.community.push(room.deck.pop());
+    room.lastAction = "Flop dealt.";
+    return true;
+  }
+
+  if (room.phase === "flop") {
+    room.phase = "turn";
+    while (room.community.length < 4) room.community.push(room.deck.pop());
+    room.lastAction = "Turn dealt.";
+    return true;
+  }
+
+  if (room.phase === "turn") {
+    room.phase = "river";
+    while (room.community.length < 5) room.community.push(room.deck.pop());
+    room.lastAction = "River dealt.";
+    return true;
+  }
+
+  return false;
+}
+
+function runOutBoardAndFinish(room) {
+  collectOutstandingBets(room);
+  while (room.community.length < 5 && ["preflop", "flop", "turn"].includes(room.phase)) {
+    dealNextStreet(room);
+  }
+  return finishHand(room);
+}
+
+
 function endBettingRound(room) {
   collectOutstandingBets(room);
 
@@ -277,195 +335,39 @@ function endBettingRound(room) {
 
   if (activePlayers(room).length <= 1) return finishHand(room);
 
-  if (room.phase === "preflop") {
-    room.phase = "flop";
-    room.community.push(room.deck.pop(), room.deck.pop(), room.deck.pop());
-    room.lastAction = "Flop dealt.";
-  } else if (room.phase === "flop") {
-    room.phase = "turn";
-    room.community.push(room.deck.pop());
-    room.lastAction = "Turn dealt.";
-  } else if (room.phase === "turn") {
-    room.phase = "river";
-    room.community.push(room.deck.pop());
-    room.lastAction = "River dealt.";
-  } else if (room.phase === "river") {
+  if (room.phase === "river") {
     return finishHand(room);
   }
 
+  dealNextStreet(room);
   room.message = room.lastAction;
+  room.actionSeq = (room.actionSeq || 0) + 1;
+
+  // Critical all-in rule:
+  // If every remaining player is all-in, there is no more betting.
+  // The board must run out to 5 cards before showdown.
+  if (playersAbleToAct(room).length === 0) {
+    return runOutBoardAndFinish(room);
+  }
+
   room.turnIndex = nextIndex(room, room.dealerIndex);
-  if (room.turnIndex < 0) return finishHand(room);
+  if (room.turnIndex < 0) return runOutBoardAndFinish(room);
 }
 
 function afterAction(room) {
   if (activePlayers(room).length <= 1) return finishHand(room);
+
+  // If nobody can make any more betting decision, run the board out.
+  if (playersAbleToAct(room).length === 0) {
+    return runOutBoardAndFinish(room);
+  }
+
   if (allBetsMatchedOrAllIn(room)) return endBettingRound(room);
+
   const next = nextIndex(room, room.turnIndex);
   if (next >= 0) room.turnIndex = next;
-  else endBettingRound(room);
+  else runOutBoardAndFinish(room);
 }
-
-
-function collectOutstandingBets(room) {
-  for (const p of room.players) {
-    if (p.bet > 0) {
-      room.pot += p.bet;
-      p.bet = 0;
-    }
-  }
-}
-
-function playersInHand(room) {
-  return room.players.filter(p => p.hand && p.hand.length === 2 && p.totalCommitted > 0);
-}
-
-function sidePotEligibility(room, lower, upper) {
-  const contributors = playersInHand(room).filter(p => p.totalCommitted > lower);
-  const eligible = contributors.filter(p => !p.folded && p.totalCommitted >= upper);
-  return { contributors, eligible };
-}
-
-function buildSidePots(room) {
-  const levels = [...new Set(playersInHand(room)
-    .map(p => p.totalCommitted)
-    .filter(v => v > 0))]
-    .sort((a, b) => a - b);
-
-  const pots = [];
-  let lower = 0;
-
-  for (const upper of levels) {
-    const { contributors, eligible } = sidePotEligibility(room, lower, upper);
-    const amount = (upper - lower) * contributors.length;
-
-    if (amount > 0 && eligible.length > 0) {
-      pots.push({
-        amount,
-        lower,
-        upper,
-        eligible
-      });
-    }
-
-    lower = upper;
-  }
-
-  return pots;
-}
-
-function evaluateRemainingPlayers(room) {
-  for (const p of room.players) {
-    p.lastScore = null;
-  }
-
-  const remaining = room.players.filter(p => !p.folded && p.hand && p.hand.length === 2);
-  if (remaining.length === 1) {
-    remaining[0].lastScore = {
-      name: "Fold Win",
-      cn: "弃牌胜利",
-      rank: -1,
-      effect: "foldwin",
-      tiebreak: []
-    };
-    return;
-  }
-
-  for (const p of remaining) {
-    p.lastScore = evaluateSeven([...p.hand, ...room.community]);
-  }
-}
-
-function winnersForPot(eligible) {
-  let best = null;
-  let winners = [];
-
-  for (const p of eligible) {
-    const score = p.lastScore;
-    if (!score) continue;
-    if (!best || compareScore(score, best) > 0) {
-      best = score;
-      winners = [p];
-    } else if (compareScore(score, best) === 0) {
-      winners.push(p);
-    }
-  }
-
-  return { winners, best };
-}
-
-function awardSidePots(room) {
-  evaluateRemainingPlayers(room);
-
-  const pots = buildSidePots(room);
-  const awardMap = new Map();
-  const potBreakdown = [];
-  let unawarded = 0;
-
-  for (const pot of pots) {
-    const { winners, best } = winnersForPot(pot.eligible);
-
-    if (!winners.length) {
-      unawarded += pot.amount;
-      continue;
-    }
-
-    const share = Math.floor(pot.amount / winners.length);
-    const remainder = pot.amount % winners.length;
-
-    winners.forEach((w, idx) => {
-      const extra = idx < remainder ? 1 : 0;
-      const amount = share + extra;
-      w.chips += amount;
-      awardMap.set(w.id, (awardMap.get(w.id) || 0) + amount);
-    });
-
-    potBreakdown.push({
-      amount: pot.amount,
-      winners: winners.map(w => w.name),
-      handNameCn: best?.cn || "弃牌胜利",
-      eligible: pot.eligible.map(p => p.name)
-    });
-  }
-
-  if (unawarded > 0) {
-    const stillIn = room.players.filter(p => !p.folded);
-    const target = stillIn[0] || room.players[room.dealerIndex] || room.players[0];
-    if (target) {
-      target.chips += unawarded;
-      awardMap.set(target.id, (awardMap.get(target.id) || 0) + unawarded);
-      potBreakdown.push({
-        amount: unawarded,
-        winners: [target.name],
-        handNameCn: "Unawarded chips returned",
-        eligible: [target.name]
-      });
-    }
-  }
-
-  const winners = [...awardMap.entries()]
-    .map(([id, amount]) => {
-      const p = room.players.find(x => x.id === id);
-      return {
-        player: p,
-        amount
-      };
-    })
-    .filter(x => x.player)
-    .sort((a, b) => b.amount - a.amount);
-
-  return { winners, potBreakdown };
-}
-
-function showdownMessage(room, winners) {
-  if (!winners.length) return "No winner.";
-  if (winners.length === 1) {
-    const w = winners[0].player;
-    return `${w.name} wins ${winners[0].amount} with ${w.lastScore?.cn || "弃牌胜利"}.`;
-  }
-  return winners.map(x => `${x.player.name} +${x.amount}`).join(", ");
-}
-
 
 function finishHand(room) {
   collectOutstandingBets(room);
@@ -520,6 +422,7 @@ function finishHand(room) {
   room.minRaise = room.bigBlind;
   room.actedThisRound = new Set();
   room.lastAction = room.finalWinner ? "Final winner decided." : "Showdown complete.";
+  room.actionSeq = (room.actionSeq || 0) + 1;
 
   const nextDealer = nextSeatedWithChips(room, room.dealerIndex);
   room.dealerIndex = nextDealer < 0 ? 0 : nextDealer;
@@ -648,6 +551,7 @@ function resetHandToLobbyAfterDisconnect(room, disconnectedName) {
   room.finalWinner = null;
   room.message = `${disconnectedName} disconnected and was kicked. Hand cancelled. Start a new hand.`;
   room.lastAction = "Player disconnected. Hand cancelled.";
+  room.actionSeq = (room.actionSeq || 0) + 1;
 }
 
 io.on("connection", (socket) => {
@@ -750,13 +654,21 @@ io.on("connection", (socket) => {
     emitRoom(room);
   });
 
-  socket.on("action", ({ type, amount }) => {
+  socket.on("action", ({ type, amount, actionSeq }) => {
     const found = findPlayerRoom(socket.id);
     if (!found) return;
     const { room, player } = found;
     if (room.phase === "lobby" || room.phase === "showdown") return;
     if (room.players[room.turnIndex]?.id !== socket.id) return;
     if (player.folded || player.allIn) return;
+
+    // Prevent stale/double-click actions. The client must send the actionSeq it saw.
+    // If the server already advanced to a new street/turn, old clicks are ignored.
+    if (Number(actionSeq) !== Number(room.actionSeq || 0)) return;
+
+    const now = Date.now();
+    if (player.lastActionAt && now - player.lastActionAt < 220) return;
+    player.lastActionAt = now;
 
     const callAmount = Math.max(0, room.currentBet - player.bet);
 
@@ -824,6 +736,7 @@ io.on("connection", (socket) => {
     }
 
     room.message = room.lastAction;
+    room.actionSeq = (room.actionSeq || 0) + 1;
     afterAction(room);
     emitRoom(room);
   });
@@ -878,6 +791,7 @@ io.on("connection", (socket) => {
     room.finalWinner = null;
     room.message = "Back to room. Set stacks, then start a new game.";
     room.lastAction = "Returned to lobby.";
+    room.actionSeq = (room.actionSeq || 0) + 1;
     emitRoom(room);
   });
 
