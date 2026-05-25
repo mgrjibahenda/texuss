@@ -1046,8 +1046,466 @@ function startCanvasCinematic(effect, options = {}) {
   setTimeout(() => stopCanvasCinematic(), options.duration || 7600);
 }
 
+
+let threeFx = null;
+
+function stopThreeCinematic() {
+  if (threeFx?.raf) cancelAnimationFrame(threeFx.raf);
+  if (threeFx?.cleanup) threeFx.cleanup();
+  if (threeFx?.container) threeFx.container.remove();
+  threeFx = null;
+}
+
+function startThreeCinematic(effect, options = {}) {
+  stopThreeCinematic();
+
+  if (!window.THREE) {
+    console.warn("Three.js not loaded. Falling back to Canvas/CSS effects only.");
+    return;
+  }
+
+  const THREE = window.THREE;
+  const container = document.createElement("div");
+  container.id = "threeCinematicFx";
+  container.className = `threeCinematicFx three-${effect}`;
+  document.body.appendChild(container);
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x000000, 0.018);
+
+  const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 220);
+  camera.position.set(0, 18, 42);
+  camera.lookAt(0, 0, 0);
+
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: "high-performance" });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  container.appendChild(renderer.domElement);
+
+  const clock = new THREE.Clock();
+  const objects = [];
+  const flyingCards = [];
+  const chips = [];
+  const shards = [];
+  const rings = [];
+  let raf = null;
+
+  const palette = {
+    royal: [0xffd700, 0xffffff, 0xff8a00, 0xffef8a],
+    straightflush: [0x9dfffc, 0x7dff9d, 0xf5d66c, 0xffffff],
+    fourkind: [0xd9b3ff, 0xffb3e6, 0xffffff, 0x8d4dff],
+    fullhouse: [0xffc46b, 0xfff0a8, 0xff8d8d, 0xffffff],
+    flush: [0x64d2ff, 0xd7ffe8, 0xffffff, 0x008cff],
+    straight: [0xb8ff7d, 0xffffff, 0xeaff74, 0x66ff33],
+    threekind: [0xffb3b3, 0xfff0a8, 0xffffff, 0xff7755],
+    twopair: [0xcde2ff, 0xf5d66c, 0xffffff, 0x77aaff],
+    onepair: [0xffffff, 0xe8e8e8, 0xf5d66c, 0xbbbbbb],
+    bust: [0xff3333, 0x7b0000, 0xffffff, 0xff8800]
+  }[effect] || [0xffffff, 0xf5d66c, 0xaaaaaa];
+
+  const power = {
+    onepair: 1.0,
+    twopair: 1.25,
+    threekind: 1.5,
+    straight: 1.9,
+    flush: 2.05,
+    fullhouse: 2.25,
+    fourkind: 2.6,
+    straightflush: 3.0,
+    royal: 3.6,
+    bust: 3.0
+  }[effect] || 1.4;
+
+  function mat(color, roughness = 0.32, metalness = 0.45, emissive = 0x000000, emissiveIntensity = 0) {
+    return new THREE.MeshStandardMaterial({
+      color,
+      roughness,
+      metalness,
+      emissive,
+      emissiveIntensity,
+      transparent: true
+    });
+  }
+
+  function add(obj) {
+    scene.add(obj);
+    objects.push(obj);
+    return obj;
+  }
+
+  const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+  scene.add(ambient);
+
+  const keyLight = new THREE.PointLight(palette[0], 7.5 * power, 120);
+  keyLight.position.set(0, 22, 20);
+  scene.add(keyLight);
+
+  const rimLight = new THREE.PointLight(palette[1], 4.8 * power, 100);
+  rimLight.position.set(-18, 10, -15);
+  scene.add(rimLight);
+
+  const flashLight = new THREE.PointLight(palette[2], 0, 150);
+  flashLight.position.set(0, 8, 0);
+  scene.add(flashLight);
+
+  // 3D poker table
+  const tableGroup = new THREE.Group();
+  scene.add(tableGroup);
+
+  const tableGeo = new THREE.CylinderGeometry(18, 20, 1.7, 96);
+  const tableMat = new THREE.MeshStandardMaterial({
+    color: 0x0c6b42,
+    roughness: 0.65,
+    metalness: 0.08,
+    emissive: 0x073d27,
+    emissiveIntensity: 0.18
+  });
+  const table = new THREE.Mesh(tableGeo, tableMat);
+  table.position.y = -1.2;
+  tableGroup.add(table);
+
+  const railGeo = new THREE.TorusGeometry(19.2, 1.05, 18, 128);
+  const railMat = new THREE.MeshStandardMaterial({
+    color: 0x6a371a,
+    roughness: 0.38,
+    metalness: 0.28,
+    emissive: 0x201006,
+    emissiveIntensity: 0.12
+  });
+  const rail = new THREE.Mesh(railGeo, railMat);
+  rail.rotation.x = Math.PI / 2;
+  rail.position.y = -0.35;
+  tableGroup.add(rail);
+
+  const innerGlow = new THREE.Mesh(
+    new THREE.TorusGeometry(15.8, 0.07, 8, 128),
+    new THREE.MeshBasicMaterial({ color: palette[0], transparent: true, opacity: 0.75 })
+  );
+  innerGlow.rotation.x = Math.PI / 2;
+  innerGlow.position.y = -0.22;
+  tableGroup.add(innerGlow);
+
+  // Card texture with rank/effect text
+  function makeCardTexture(label, color = "#111") {
+    const canvas = document.createElement("canvas");
+    canvas.width = 320;
+    canvas.height = 448;
+    const ctx = canvas.getContext("2d");
+    const grad = ctx.createLinearGradient(0, 0, 320, 448);
+    grad.addColorStop(0, "#ffffff");
+    grad.addColorStop(1, "#e9e2d3");
+    ctx.fillStyle = grad;
+    roundRect(ctx, 12, 12, 296, 424, 24);
+    ctx.fill();
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = "#111";
+    roundRect(ctx, 22, 22, 276, 404, 20);
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.font = "bold 56px Arial";
+    ctx.textAlign = "left";
+    ctx.fillText(label, 38, 76);
+    ctx.font = "bold 112px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(label.replace("10", "T").slice(0, 2), 160, 235);
+    ctx.font = "bold 42px Arial";
+    ctx.fillText(effect.toUpperCase().slice(0, 10), 160, 330);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function spawnCard(i, total, special = false) {
+    const labelsByEffect = {
+      royal: ["A♠", "K♠", "Q♠", "J♠", "10♠"],
+      straightflush: ["9♥", "8♥", "7♥", "6♥", "5♥"],
+      fourkind: ["A♠", "A♥", "A♦", "A♣"],
+      fullhouse: ["K♠", "K♥", "K♦", "9♠", "9♥"],
+      flush: ["A♦", "J♦", "8♦", "5♦", "2♦"],
+      straight: ["9♠", "8♥", "7♦", "6♣", "5♠"],
+      threekind: ["Q♠", "Q♥", "Q♦"],
+      twopair: ["J♠", "J♥", "8♦", "8♣"],
+      onepair: ["10♠", "10♥"],
+      bust: ["2♣", "7♦"]
+    };
+    const label = (labelsByEffect[effect] || labelsByEffect.onepair)[i % (labelsByEffect[effect] || labelsByEffect.onepair).length];
+    const texture = makeCardTexture(label, label.includes("♥") || label.includes("♦") ? "#c40000" : "#111111");
+    const geo = new THREE.PlaneGeometry(3.2, 4.45, 1, 1);
+    const material = new THREE.MeshStandardMaterial({
+      map: texture,
+      roughness: 0.35,
+      metalness: 0.05,
+      side: THREE.DoubleSide,
+      emissive: palette[i % palette.length],
+      emissiveIntensity: special ? 0.18 : 0.06
+    });
+    const card = new THREE.Mesh(geo, material);
+    const angle = (i / total) * Math.PI * 2;
+    card.position.set(Math.cos(angle) * 1.2, 2 + i * 0.04, Math.sin(angle) * 1.2);
+    card.rotation.set(Math.random() * 0.8, angle, Math.random() * 0.4);
+    card.userData = {
+      target: new THREE.Vector3((i - (total - 1) / 2) * 4.1, 5 + Math.sin(i) * 0.6, -2.5),
+      spin: new THREE.Vector3((Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.14, (Math.random() - 0.5) * 0.12),
+      flyDelay: i * 0.08,
+      baseY: 4.5 + Math.sin(i) * 0.7
+    };
+    add(card);
+    flyingCards.push(card);
+  }
+
+  const cardCount = effect === "fourkind" ? 4 : effect === "threekind" ? 3 : effect === "twopair" || effect === "onepair" ? 4 : 5;
+  for (let i = 0; i < cardCount; i++) spawnCard(i, cardCount, true);
+
+  function spawnChip(i, count) {
+    const geo = new THREE.CylinderGeometry(0.62, 0.62, 0.18, 36);
+    const material = new THREE.MeshStandardMaterial({
+      color: palette[i % palette.length],
+      roughness: 0.28,
+      metalness: 0.72,
+      emissive: palette[i % palette.length],
+      emissiveIntensity: 0.12
+    });
+    const chip = new THREE.Mesh(geo, material);
+    chip.position.set(0, 0.8, 0);
+    chip.rotation.x = Math.PI / 2;
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.12 + Math.random() * 0.32 * power;
+    chip.userData = {
+      v: new THREE.Vector3(Math.cos(angle) * speed, 0.18 + Math.random() * 0.28 * power, Math.sin(angle) * speed),
+      g: 0.008,
+      rot: new THREE.Vector3(Math.random()*0.25, Math.random()*0.25, Math.random()*0.25),
+      life: 200 + Math.random() * 100
+    };
+    add(chip);
+    chips.push(chip);
+  }
+
+  const chipCount = Math.min(260, Math.floor(45 + power * 46));
+  for (let i = 0; i < chipCount; i++) spawnChip(i, chipCount);
+
+  function spawnShard(i, count) {
+    const geo = effect === "bust"
+      ? new THREE.TetrahedronGeometry(0.25 + Math.random()*0.6)
+      : new THREE.SphereGeometry(0.08 + Math.random()*0.22, 12, 8);
+    const material = new THREE.MeshBasicMaterial({ color: palette[i % palette.length], transparent: true, opacity: 0.88 });
+    const shard = new THREE.Mesh(geo, material);
+    shard.position.set((Math.random()-0.5)*5, 2 + Math.random()*2, (Math.random()-0.5)*5);
+    const a = Math.random() * Math.PI * 2;
+    const speed = 0.15 + Math.random() * 0.55 * power;
+    shard.userData = {
+      v: new THREE.Vector3(Math.cos(a)*speed, (Math.random()-0.15)*speed, Math.sin(a)*speed),
+      rot: new THREE.Vector3(Math.random()*0.18, Math.random()*0.18, Math.random()*0.18),
+      life: 140 + Math.random()*120
+    };
+    add(shard);
+    shards.push(shard);
+  }
+
+  const shardCount = Math.min(900, Math.floor(160 + power * 150));
+  for (let i = 0; i < shardCount; i++) spawnShard(i, shardCount);
+
+  function spawnRing(i) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(2 + i * 1.4, 0.05 + i * 0.01, 8, 128),
+      new THREE.MeshBasicMaterial({ color: palette[i % palette.length], transparent: true, opacity: 0.75 })
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.2 + i * 0.08;
+    ring.userData = { scaleSpeed: 0.012 + i * 0.003, fade: 0.006 + i * 0.001 };
+    add(ring);
+    rings.push(ring);
+  }
+  for (let i = 0; i < Math.floor(3 + power); i++) spawnRing(i);
+
+  // Effect-specific 3D objects
+  if (effect === "royal") {
+    const crown = new THREE.Group();
+    for (let i = 0; i < 7; i++) {
+      const cone = new THREE.Mesh(
+        new THREE.ConeGeometry(0.75, 3.2 + (i % 2)*1.2, 24),
+        mat(0xffd700, 0.18, 0.95, 0xffd700, 0.35)
+      );
+      cone.position.set((i-3)*1.05, 10 + Math.abs(i-3)*0.25, 0);
+      crown.add(cone);
+    }
+    const base = new THREE.Mesh(new THREE.TorusGeometry(3.9, 0.34, 16, 96), mat(0xffd700, .18, .95, 0xffd700, .28));
+    base.rotation.x = Math.PI/2;
+    base.position.y = 8.4;
+    crown.add(base);
+    crown.userData = { royal: true };
+    scene.add(crown);
+    objects.push(crown);
+  }
+
+  if (effect === "straightflush" || effect === "straight") {
+    for (let i = 0; i < 9; i++) {
+      const boltMat = new THREE.MeshBasicMaterial({ color: effect === "straight" ? 0xb8ff7d : palette[i % palette.length], transparent: true, opacity: 0.88 });
+      const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 42), boltMat);
+      bolt.position.set((i-4)*2.8, 6 + Math.sin(i)*2, -4 + Math.cos(i)*2);
+      bolt.rotation.set(Math.random()*1.6, Math.random()*3.14, Math.random()*1.6);
+      bolt.userData = { bolt: true, speed: 0.025 + Math.random()*0.03 };
+      add(bolt);
+    }
+  }
+
+  if (effect === "bust" || options.bust) {
+    table.material.color.setHex(0x3d0505);
+    table.material.emissive.setHex(0x220000);
+    for (let i = 0; i < 18; i++) {
+      const crack = new THREE.Mesh(
+        new THREE.BoxGeometry(0.08, 0.08, 12 + Math.random()*16),
+        new THREE.MeshBasicMaterial({ color: 0xff2222, transparent: true, opacity: 0.9 })
+      );
+      crack.position.set((Math.random()-0.5)*24, 0.15, (Math.random()-0.5)*18);
+      crack.rotation.y = Math.random()*Math.PI;
+      crack.userData = { crack: true };
+      tableGroup.add(crack);
+    }
+  }
+
+  function resize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+  window.addEventListener("resize", resize, { passive: true });
+
+  function easeOutCubic(x) {
+    return 1 - Math.pow(1 - x, 3);
+  }
+
+  function animate() {
+    const dt = Math.min(clock.getDelta(), 0.033);
+    const elapsed = clock.elapsedTime;
+    const intro = Math.min(elapsed / 1.45, 1);
+    const climax = Math.min(Math.max((elapsed - 1.2) / 1.1, 0), 1);
+    const slowmo = elapsed > 2.05 && elapsed < 3.05;
+    const speedMul = slowmo ? 0.18 : 1;
+
+    // Cinematic camera zoom/rotation
+    const zoomIn = easeOutCubic(intro);
+    const orbit = elapsed * (0.18 + power * 0.015);
+    const radius = 42 - zoomIn * 15 + Math.sin(elapsed*1.6) * 1.4;
+    camera.position.x = Math.sin(orbit) * (6 + power);
+    camera.position.z = radius;
+    camera.position.y = 19 - zoomIn * 8 + Math.sin(elapsed * 1.1) * 1.2;
+    if (elapsed > 3.15) {
+      camera.position.z += Math.sin((elapsed-3.15) * 2.4) * 2.4;
+      camera.position.y += Math.sin((elapsed-3.15) * 1.8) * 1.0;
+    }
+    camera.lookAt(0, 2.3, -2);
+
+    const shake = (effect === "bust" || power >= 2.5) ? Math.sin(elapsed*45) * 0.08 * power : 0;
+    camera.position.x += shake;
+    camera.position.y += Math.cos(elapsed*39) * 0.04 * power;
+
+    tableGroup.rotation.y += dt * 0.12 * power * speedMul;
+    innerGlow.material.opacity = 0.35 + Math.sin(elapsed*5) * 0.25;
+    flashLight.intensity = Math.max(0, Math.sin(elapsed * 7) * 4 * power + climax * 10);
+
+    // Flying cards: true 3D fan, then slow-motion hold
+    flyingCards.forEach((card, i) => {
+      const localT = Math.max(0, Math.min((elapsed - card.userData.flyDelay) / 1.35, 1));
+      const e = easeOutCubic(localT);
+      card.position.lerp(card.userData.target, e * 0.16);
+      card.position.y += Math.sin(elapsed * 3 + i) * 0.015;
+      card.rotation.x += card.userData.spin.x * speedMul;
+      card.rotation.y += card.userData.spin.y * speedMul;
+      card.rotation.z += card.userData.spin.z * speedMul;
+      if (elapsed > 1.6) {
+        card.rotation.y = Math.sin(elapsed*1.2 + i) * 0.16;
+        card.rotation.x = -0.18 + Math.cos(elapsed*1.4+i) * 0.08;
+      }
+    });
+
+    chips.forEach((chip, idx) => {
+      const d = chip.userData;
+      chip.position.addScaledVector(d.v, speedMul);
+      d.v.y -= d.g * speedMul;
+      chip.rotation.x += d.rot.x * speedMul;
+      chip.rotation.y += d.rot.y * speedMul;
+      chip.rotation.z += d.rot.z * speedMul;
+      if (chip.position.y < -0.1 && d.v.y < 0) {
+        chip.position.y = -0.1;
+        d.v.y *= -0.42;
+        d.v.x *= 0.72;
+        d.v.z *= 0.72;
+      }
+      d.life -= speedMul;
+      if (d.life < 40) chip.material.opacity = Math.max(0, d.life/40);
+    });
+
+    shards.forEach((s) => {
+      const d = s.userData;
+      s.position.addScaledVector(d.v, speedMul);
+      d.v.multiplyScalar(0.992);
+      d.v.y -= (effect === "bust" ? 0.009 : 0.002) * speedMul;
+      s.rotation.x += d.rot.x * speedMul;
+      s.rotation.y += d.rot.y * speedMul;
+      s.rotation.z += d.rot.z * speedMul;
+      d.life -= speedMul;
+      if (s.material.opacity !== undefined && d.life < 55) s.material.opacity = Math.max(0, d.life/55);
+    });
+
+    rings.forEach((r, i) => {
+      r.scale.multiplyScalar(1 + r.userData.scaleSpeed * speedMul);
+      r.rotation.z += dt * (0.4 + i*0.1) * speedMul;
+      r.material.opacity = Math.max(0, r.material.opacity - r.userData.fade * speedMul);
+      if (r.material.opacity < 0.08) r.material.opacity = 0.75;
+    });
+
+    objects.forEach((obj) => {
+      if (obj.userData?.royal) {
+        obj.rotation.y += dt * 0.7 * speedMul;
+        obj.position.y = Math.sin(elapsed*1.5) * 0.5;
+      }
+      if (obj.userData?.bolt) {
+        obj.rotation.y += obj.userData.speed * 3 * speedMul;
+        obj.material.opacity = 0.35 + Math.random() * 0.65;
+      }
+    });
+
+    renderer.render(scene, camera);
+    raf = requestAnimationFrame(animate);
+    if (threeFx) threeFx.raf = raf;
+  }
+
+  threeFx = {
+    container,
+    raf,
+    cleanup: () => {
+      window.removeEventListener("resize", resize);
+      renderer.dispose();
+      scene.traverse((obj) => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+          if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+          else obj.material.dispose();
+        }
+        if (obj.material?.map) obj.material.map.dispose();
+      });
+    }
+  };
+
+  animate();
+
+  const duration = options.duration || (options.finalWinner ? 9800 : 8200);
+  setTimeout(() => stopThreeCinematic(), duration);
+}
+
 function removeOverlay(id) {
-  if (id === "showOverlay") stopCanvasCinematic();
+  if (id === "showOverlay") { stopCanvasCinematic(); stopThreeCinematic(); }
   const old = document.getElementById(id);
   if (old) old.remove();
 }
