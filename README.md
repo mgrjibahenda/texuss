@@ -171,3 +171,20 @@ npm run test:v17
 npm run test:core-static
 npm run test:hands
 ```
+
+
+## v18.1 Second Hand Fix
+
+Focused fix for: buttons work in the first hand but become useless in the second hand.
+
+Changes:
+
+- Added `normalizeTurn(room)` on the server.
+- `playerActionState()` now normalizes turn before returning button state.
+- Removed redundant 80ms server action cooldown that could make clicks look dead.
+- `startHand()` now clears old emotes and validates the first actor.
+- `endBettingRound()` and `afterAction()` normalize turn after moving to the next player/street.
+- Client clears old showdown/hand overlays whenever hand number or phase changes.
+- Client force-unlocks action buttons on every render.
+
+This keeps safe emotes, side pots, all-in runout, and server-driven buttons.

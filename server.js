@@ -126,7 +126,21 @@ function createRoom(hostId, hostName) {
 }
 
 
+
+function normalizeTurn(room) {
+  if (["lobby", "showdown"].includes(room.phase)) return;
+
+  const current = room.players[room.turnIndex];
+  if (canAct(current)) return;
+
+  const next = nextIndex(room, room.turnIndex >= 0 ? room.turnIndex : room.dealerIndex);
+  if (next >= 0) {
+    room.turnIndex = next;
+  }
+}
+
 function playerActionState(room, player) {
+  normalizeTurn(room);
   if (!player) {
     return {
       canAct: false,
@@ -295,6 +309,7 @@ function startHand(room) {
   room.winners = [];
   room.potBreakdown = [];
   room.busted = [];
+  room.emotes = [];
   room.finalWinner = null;
   room.lastAction = "";
   room.actionSeq = (room.actionSeq || 0) + 1;
@@ -351,7 +366,8 @@ function startHand(room) {
   // 2 players: small blind/dealer acts first.
   // 3+ players: first live player left of big blind acts first.
   room.turnIndex = eligibleCount === 2 ? sbIndex : nextIndex(room, bbIndex);
-  if (room.turnIndex < 0) return runOutBoardAndFinish(room);
+  normalizeTurn(room);
+  if (room.turnIndex < 0 || playersAbleToAct(room).length === 0) return runOutBoardAndFinish(room);
 
   room.message = `${sb.name} posts small blind (${sbPaid}), ${bb.name} posts big blind (${bbPaid}).`;
   room.lastAction = `Hand ${room.handNumber} begins.`;
@@ -424,15 +440,17 @@ function endBettingRound(room) {
   room.message = room.lastAction;
   room.actionSeq = (room.actionSeq || 0) + 1;
 
-  // If all remaining players are all-in, deal to river and finish.
   if (playersAbleToAct(room).length === 0) {
     return runOutBoardAndFinish(room);
   }
 
   // Postflop: first live player left of dealer/button acts first.
   room.turnIndex = nextIndex(room, room.dealerIndex);
+  normalizeTurn(room);
   if (room.turnIndex < 0) return runOutBoardAndFinish(room);
 }
+
+
 
 
 
@@ -450,11 +468,14 @@ function afterAction(room) {
   const next = nextIndex(room, room.turnIndex);
   if (next >= 0) {
     room.turnIndex = next;
+    normalizeTurn(room);
     return;
   }
 
   return runOutBoardAndFinish(room);
 }
+
+
 
 
 
@@ -872,9 +893,6 @@ socket.on("action", ({ type, amount }) => {
       return;
     }
 
-    const now = Date.now();
-    if (player.lastActionAt && now - player.lastActionAt < 80) return;
-
     const callAmount = Math.max(0, room.currentBet - player.bet);
     let accepted = false;
 
@@ -959,7 +977,6 @@ socket.on("action", ({ type, amount }) => {
 
     if (!accepted) return;
 
-    player.lastActionAt = now;
     room.message = room.lastAction;
     room.actionSeq = (room.actionSeq || 0) + 1;
     afterAction(room);

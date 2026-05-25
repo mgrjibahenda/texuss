@@ -2,6 +2,7 @@ const socket = io();
 
 let state = null;
 let actionSubmitting = false;
+let lastRenderedHandPhase = "";
 let lastShowdownKey = "";
 let lastPersonalScoreKey = "";
 let seenEmoteIds = new Set();
@@ -343,6 +344,13 @@ socket.on("kicked", ({ reason }) => {
 });
 
 socket.on("state", (s) => {
+  const nextKey = `${s.handNumber}|${s.phase}`;
+  if (nextKey !== lastRenderedHandPhase) {
+    actionSubmitting = false;
+    removeOverlay("showOverlay");
+    removeOverlay("handOverlay");
+    lastRenderedHandPhase = nextKey;
+  }
   state = s;
   render();
 });
@@ -548,6 +556,7 @@ function renderActions() {
   };
 
   panel.classList.remove("hidden");
+  buttons.querySelectorAll("button").forEach(b => b.disabled = false);
   $("turnText").textContent = a.canAct
     ? `轮到你行动 · 跟注 ${a.callAmount} · 你的筹码 ${me.chips}`
     : a.reason;
