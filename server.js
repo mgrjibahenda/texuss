@@ -247,6 +247,42 @@ function allBetsMatchedOrAllIn(room) {
   return able.every(p => p.bet === room.currentBet && room.actedThisRound.has(p.id));
 }
 
+
+function dealNextStreet(room) {
+  if (room.phase === "preflop") {
+    room.phase = "flop";
+    while (room.community.length < 3) room.community.push(room.deck.pop());
+    room.lastAction = "Flop dealt.";
+  } else if (room.phase === "flop") {
+    room.phase = "turn";
+    if (room.community.length < 4) room.community.push(room.deck.pop());
+    room.lastAction = "Turn dealt.";
+  } else if (room.phase === "turn") {
+    room.phase = "river";
+    if (room.community.length < 5) room.community.push(room.deck.pop());
+    room.lastAction = "River dealt.";
+  }
+}
+
+function runOutBoardAndFinish(room) {
+  while (room.community.length < 5 && room.deck.length) {
+    if (room.community.length < 3) {
+      room.phase = "flop";
+      while (room.community.length < 3 && room.deck.length) room.community.push(room.deck.pop());
+    } else if (room.community.length === 3) {
+      room.phase = "turn";
+      room.community.push(room.deck.pop());
+    } else if (room.community.length === 4) {
+      room.phase = "river";
+      room.community.push(room.deck.pop());
+    }
+  }
+  room.lastAction = "All-in runout complete.";
+  room.message = room.lastAction;
+  return finishHand(room);
+}
+
+
 function endBettingRound(room) {
   for (const p of room.players) {
     room.pot += p.bet;
@@ -259,20 +295,14 @@ function endBettingRound(room) {
 
   if (activePlayers(room).length <= 1) return finishHand(room);
 
-  if (room.phase === "preflop") {
-    room.phase = "flop";
-    room.community.push(room.deck.pop(), room.deck.pop(), room.deck.pop());
-    room.lastAction = "Flop dealt.";
-  } else if (room.phase === "flop") {
-    room.phase = "turn";
-    room.community.push(room.deck.pop());
-    room.lastAction = "Turn dealt.";
-  } else if (room.phase === "turn") {
-    room.phase = "river";
-    room.community.push(room.deck.pop());
-    room.lastAction = "River dealt.";
-  } else if (room.phase === "river") {
+  if (room.phase === "river") {
     return finishHand(room);
+  }
+
+  dealNextStreet(room);
+
+  if (playersAbleToAct(room).length === 0) {
+    return runOutBoardAndFinish(room);
   }
 
   room.message = room.lastAction;
@@ -280,13 +310,23 @@ function endBettingRound(room) {
   if (room.turnIndex < 0) return finishHand(room);
 }
 
+
+
 function afterAction(room) {
   if (activePlayers(room).length <= 1) return finishHand(room);
+
+  if (playersAbleToAct(room).length === 0) {
+    return runOutBoardAndFinish(room);
+  }
+
   if (allBetsMatchedOrAllIn(room)) return endBettingRound(room);
+
   const next = nextIndex(room, room.turnIndex);
   if (next >= 0) room.turnIndex = next;
   else endBettingRound(room);
 }
+
+
 
 function finishHand(room) {
   for (const p of room.players) {
@@ -454,7 +494,8 @@ function findPlayerRoom(socketId) {
 
 function resetHandToLobbyAfterDisconnect(room, disconnectedName) {
   for (const p of room.players) {
-    if (p.totalCommitted) p.chips += p.totalCommitted;
+    p.chips += p.bet;
+    p.chips += p.totalCommitted;
     p.bet = 0;
     p.totalCommitted = 0;
     p.hand = [];
@@ -462,6 +503,7 @@ function resetHandToLobbyAfterDisconnect(room, disconnectedName) {
     p.allIn = false;
     p.lastScore = null;
   }
+
   room.started = false;
   room.deck = [];
   room.community = [];
@@ -476,6 +518,8 @@ function resetHandToLobbyAfterDisconnect(room, disconnectedName) {
   room.message = `${disconnectedName} disconnected and was kicked. Hand cancelled. Start a new hand.`;
   room.lastAction = "Player disconnected. Hand cancelled.";
 }
+
+
 
 io.on("connection", (socket) => {
   socket.on("createRoom", ({ name }, cb) => {

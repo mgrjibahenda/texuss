@@ -1384,3 +1384,67 @@ input::placeholder { color: rgba(255,255,255,.55); }
     font-size: clamp(18px, 4vw, 30px);
   }
 }
+
+
+/* Public final safe layout */
+#galleryBtn,
+.previewMenu,
+.previewPanel,
+.previewGrid {
+  display: none !important;
+}
+
+.actionPanel {
+  position: sticky;
+  bottom: 74px;
+  z-index: 5000 !important;
+  pointer-events: auto !important;
+}
+
+.actionPanel *,
+.actionButtons *,
+.raiseGroup * {
+  pointer-events: auto !important;
+}
+
+.actionButtons button {
+  min-height: 46px;
+}
+
+.emoteBar {
+  right: 12px !important;
+  left: auto !important;
+  bottom: 12px !important;
+  transform: none !important;
+  max-width: min(390px, 42vw);
+  overflow-x: auto;
+  z-index: 3000 !important;
+  pointer-events: auto !important;
+}
+
+.emoteBtn {
+  min-width: 38px;
+  touch-action: manipulation;
+}
+
+.emoteBubble {
+  pointer-events: none !important;
+  z-index: 10000 !important;
+}
+
+.tableWrap {
+  padding-bottom: 110px;
+}
+
+@media (max-width: 760px) {
+  .actionPanel {
+    bottom: 78px;
+  }
+  .emoteBar {
+    left: 50% !important;
+    right: auto !important;
+    bottom: 10px !important;
+    transform: translateX(-50%) !important;
+    max-width: 96vw;
+  }
+}

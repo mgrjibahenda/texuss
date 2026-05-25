@@ -1,19 +1,15 @@
-# Texas Hold'em v8 Final Table
+# Texas Hold'em Public Final
 
-## v8 新增/修复
+这是基于你上传的、能正常玩的 v8 版本做的最终大众游玩版。
 
-- 修复 iPad / 手机上“一对”等圆圈特效不在正中央的问题。
-- 整体画面更真实：牌桌材质、阴影、牌面、玩家框更立体。
-- 所有赢家特效进一步增强，整体更华丽。
-- 当只剩一个人还有筹码时，出现 FINAL WINNER 最终赢家结算。
-- 最终赢家结算后，dealer 可以点 Back to Room 退回房间。
-- 有人断线会被踢出房间。
-- 如果断线发生在牌局进行中，会显示断线提示，并取消当前手牌退回 lobby，可以重新开一局。
-- 断线取消手牌时，会退回本手已投入筹码，避免莫名损失。
-- 主菜单新增 Preview Effects。
-- 点击 Preview Effects 后输入密码 `123`，可以查看所有牌型对应的赢家特效。
-- 特效预览使用和真牌局一样的画面和声音。
-- 保留右侧表情栏、音效、破产观战、破产特效。
+## 设计原则
+
+- 不使用 v17/v18/v19/v20 的复杂 `actionState / needsAction / requestId` 状态机。
+- 保留旧版能玩的核心行动逻辑：前端直接按 `turnIndex` 显示按钮。
+- 不重写 heads-up 行动规则，避免再次破坏可玩性。
+- 移除 Preview Effects，避免大众版出现隐藏密码入口。
+- 保留表情系统，但把它放在不挡按钮的位置。
+- 修复全员 all-in 后只发 flop 的问题：现在会自动发满 5 张公共牌再 showdown。
 
 ## Render 设置
 
@@ -29,4 +25,21 @@ Start Command:
 npm start
 ```
 
-上传覆盖 GitHub 仓库后，Render 会自动重新部署。
+## 本版包含
+
+- 私人房间
+- 虚拟筹码
+- 发牌 / call / check / raise / fold / all-in
+- 自动 showdown
+- 最终赢家结算
+- 断线取消当前手牌并回 lobby
+- 安全表情栏
+- sound toggle
+
+## 测试
+
+```bash
+npm run test:public-final
+```
+
+注意：这是朋友局/大众娱乐版，不是赌场级精确软件。

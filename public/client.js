@@ -152,18 +152,6 @@ const handLines = {
 const emotes = ["😂","😭","😎","🤡","💀","🔥","😡","🙏","💸","👑","🍀","😱"];
 
 
-const galleryHands = [
-  { name: "一对", effect: "onepair", rank: 1, handNameCn: "一对" },
-  { name: "两对", effect: "twopair", rank: 2, handNameCn: "两对" },
-  { name: "三条", effect: "threekind", rank: 3, handNameCn: "三条" },
-  { name: "顺子", effect: "straight", rank: 4, handNameCn: "顺子" },
-  { name: "同花", effect: "flush", rank: 5, handNameCn: "同花" },
-  { name: "葫芦", effect: "fullhouse", rank: 6, handNameCn: "葫芦" },
-  { name: "四条", effect: "fourkind", rank: 7, handNameCn: "四条" },
-  { name: "同花顺", effect: "straightflush", rank: 8, handNameCn: "同花顺" },
-  { name: "皇家同花顺", effect: "royal", rank: 9, handNameCn: "皇家同花顺" },
-  { name: "破产特效", effect: "bust", rank: 0, handNameCn: "破产" }
-];
 
 
 $("createBtn").onclick = () => {
@@ -181,19 +169,6 @@ $("nextHandBtn").onclick = () => {
   if (state?.finalWinner) socket.emit("returnToLobbyAfterFinal");
   else socket.emit("startHand");
 };
-
-
-$("galleryBtn").onclick = () => {
-  const password = prompt("Enter password");
-  if (password !== "123") {
-    alert("Wrong password");
-    return;
-  }
-  openEffectGallery();
-};
-
-
-
 $("soundToggle").onclick = () => {
   soundEnabled = !soundEnabled;
   $("soundToggle").textContent = soundEnabled ? "🔊 Sound" : "🔇 Sound";
@@ -408,45 +383,78 @@ function renderActions() {
   const panel = $("actionPanel");
   const buttons = $("actionButtons");
   const me = state.players.find(p => p.isYou);
-  const isMyTurn = me && state.players[state.turnIndex]?.id === me.id && !["lobby", "showdown"].includes(state.phase);
+  const current = state.players[state.turnIndex];
+  const isMyTurn = me && current?.id === me.id && !["lobby", "showdown"].includes(state.phase) && !me.folded && !me.allIn && me.chips > 0;
 
   panel.classList.toggle("hidden", !isMyTurn);
-  if (!isMyTurn) return;
+  if (!isMyTurn) {
+    buttons.innerHTML = "";
+    return;
+  }
 
   const callAmount = Math.max(0, state.currentBet - me.bet);
-  $("turnText").textContent = `Your turn. To call: ${callAmount}. Stack: ${me.chips}.`;
+  $("turnText").textContent = `Your turn · To call: ${callAmount} · Stack: ${me.chips}`;
 
+  const minRaiseTo = Math.max(state.currentBet + state.minRaise, me.bet + callAmount + state.minRaise);
   const possible = [];
-  if (callAmount === 0) possible.push(`<button data-action="check" class="primary">Check</button>`);
-  if (callAmount > 0) possible.push(`<button data-action="call" class="primary">Call ${callAmount}</button>`);
-  possible.push(`<button data-action="fold">Fold</button>`);
-  possible.push(`<button data-action="allin">All-in</button>`);
+
+  if (callAmount === 0) possible.push(`<button data-action="check" class="primary">Check / 过牌</button>`);
+  if (callAmount > 0) possible.push(`<button data-action="call" class="primary">Call / 跟注 ${callAmount}</button>`);
+  possible.push(`<button data-action="fold">Fold / 弃牌</button>`);
+  possible.push(`<button data-action="allin">All-in / 全下</button>`);
   possible.push(`
     <div class="raiseGroup">
-      <input id="raiseAmount" type="number" min="${state.currentBet + state.minRaise}" step="10" placeholder="Raise to ${state.currentBet + state.minRaise}+" />
-      <button data-action="raise">Raise</button>
+      <input id="raiseAmount" type="number" min="${minRaiseTo}" step="10" placeholder="Raise to ${minRaiseTo}+" />
+      <button data-action="raise">Raise / 加注</button>
     </div>
   `);
 
   buttons.innerHTML = possible.join("");
 
   buttons.querySelectorAll("[data-action]").forEach(btn => {
-    btn.onclick = () => {
+    btn.onclick = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+
       const type = btn.dataset.action;
-      const amount = Number($("raiseAmount")?.value || 0);
+      let amount = Number($("raiseAmount")?.value || 0);
+      if (type === "raise" && (!amount || amount <= 0)) {
+        amount = minRaiseTo;
+        const input = $("raiseAmount");
+        if (input) input.value = amount;
+      }
+
+      buttons.querySelectorAll("button").forEach(b => b.disabled = true);
+      $("turnText").textContent = `Sent ${type}...`;
+
       socket.emit("action", { type, amount });
+
+      setTimeout(() => {
+        buttons.querySelectorAll("button").forEach(b => b.disabled = false);
+      }, 400);
     };
   });
 }
 
+
+
 function renderEmotes() {
   const bar = $("emoteBar");
+  if (!bar) return;
   bar.classList.toggle("hidden", !state);
-  bar.innerHTML = emotes.map(e => `<button class="emoteBtn" data-emote="${e}">${e}</button>`).join("");
+  bar.innerHTML = emotes.map(e => `<button type="button" class="emoteBtn" data-emote="${e}">${e}</button>`).join("");
   bar.querySelectorAll("[data-emote]").forEach(btn => {
-    btn.onclick = () => { playSound("emote"); socket.emit("sendEmote", { emoji: btn.dataset.emote }); };
+    btn.onclick = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      playSound("emote");
+      socket.emit("sendEmote", { emoji: btn.dataset.emote });
+      spawnEmoteBubble(btn.dataset.emote, "You");
+    };
   });
 }
+
+
 
 function spawnIncomingEmotes() {
   if (!state || !state.emotes) return;
@@ -599,44 +607,8 @@ function bustedEffectHTML() {
 }
 
 
-function openEffectGallery() {
-  removeOverlay("galleryOverlay");
-  const overlay = document.createElement("div");
-  overlay.id = "galleryOverlay";
-  overlay.className = "galleryOverlay";
-  overlay.innerHTML = `
-    <div class="galleryPanel">
-      <button class="galleryClose" id="galleryClose">×</button>
-      <h2>Winner Effect Gallery</h2>
-      <p>密码已通过。点击任意牌型，播放与真牌局相同的画面和声音。</p>
-      <div class="galleryGrid">
-        ${galleryHands.map(h => `<button class="galleryHand" data-effect="${h.effect}" data-rank="${h.rank}" data-name="${h.name}">${h.name}</button>`).join("")}
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-  $("galleryClose").onclick = () => removeOverlay("galleryOverlay");
-  overlay.querySelectorAll("[data-effect]").forEach(btn => {
-    btn.onclick = () => {
-      const effect = btn.dataset.effect;
-      const rank = Number(btn.dataset.rank);
-      const name = btn.dataset.name;
-      if (effect === "bust") {
-        showShowdownEffect(
-          [{ id: "demo", name: "Demo Winner", amount: 9999, handNameCn: "四条", effect: "fourkind", rank: 7 }],
-          [{ id: "bust", name: "Demo Loser" }],
-          null
-        );
-      } else {
-        showShowdownEffect(
-          [{ id: "demo", name: "Demo Player", amount: 8888, handNameCn: name, effect, rank }],
-          [],
-          effect === "royal" ? { id: "demo", name: "Demo Player", chips: 999999 } : null
-        );
-      }
-    };
-  });
-}
+
+
 
 
 function removeOverlay(id) {
