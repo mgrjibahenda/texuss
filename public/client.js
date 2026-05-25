@@ -154,13 +154,26 @@ const emotes = ["😂","😭","😎","🤡","💀","🔥","😡","🙏","💸","
 
 
 
+function showLoginPanel(panelId) {
+  ["mainMenuPanel", "createPanel", "joinPanel"].forEach(id => {
+    const el = $(id);
+    if (el) el.classList.toggle("hidden", id !== panelId);
+  });
+  $("loginError").textContent = "";
+}
+
+$("createModeBtn").onclick = () => showLoginPanel("createPanel");
+$("joinModeBtn").onclick = () => showLoginPanel("joinPanel");
+$("backFromCreate").onclick = () => showLoginPanel("mainMenuPanel");
+$("backFromJoin").onclick = () => showLoginPanel("mainMenuPanel");
+
 $("createBtn").onclick = () => {
   const name = $("name").value.trim() || "Player";
   socket.emit("createRoom", { name }, handleJoinResponse);
 };
 
 $("joinBtn").onclick = () => {
-  const name = $("name").value.trim() || "Player";
+  const name = ($("joinName")?.value || $("name")?.value || "").trim() || "Player";
   const code = $("roomCode").value.trim();
   socket.emit("joinRoom", { name, code }, handleJoinResponse);
 };
@@ -177,6 +190,11 @@ $("soundToggle").onclick = () => {
     playSound("chip");
   }
 };
+
+
+$("roomCode").addEventListener("input", () => {
+  $("roomCode").value = $("roomCode").value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
+});
 
 function handleJoinResponse(res) {
   if (!res.ok) {
@@ -208,6 +226,7 @@ function render() {
   renderPlayers();
   renderPersonalHandHint();
   renderActions();
+  renderHistoryLog();
   renderEmotes();
   spawnIncomingEmotes();
   playStateSounds();
@@ -218,7 +237,7 @@ function render() {
 
   if (state.phase === "showdown" && showdownKey && showdownKey !== lastShowdownKey) {
     lastShowdownKey = showdownKey;
-    showShowdownEffect(state.winners || [], state.busted || [], state.finalWinner);
+    showShowdownEffect(state.winners || [], state.finalWinner ? [] : (state.busted || []), state.finalWinner);
   }
   if (state.phase !== "showdown") {
     lastShowdownKey = "";
@@ -269,11 +288,20 @@ function renderLobby(isHost) {
   panel.classList.toggle("hidden", state.phase !== "lobby");
   if (state.phase !== "lobby") return;
 
-  hostWrap.innerHTML = isHost ? `<button class="primary" id="startHandNow">Start Hand</button>` : "";
+  hostWrap.innerHTML = isHost ? `
+    <div class="lobbyHostActions">
+      <button class="primary" id="startHandNow">Start Hand</button>
+      <button id="addBotBtn" class="addBotBtn">Add Bot</button>
+    </div>
+  ` : "";
+
   if (isHost) {
     setTimeout(() => {
-      const btn = $("startHandNow");
-      if (btn) btn.onclick = () => socket.emit("startHand");
+      const startBtn = $("startHandNow");
+      if (startBtn) startBtn.onclick = () => socket.emit("startHand");
+
+      const botBtn = $("addBotBtn");
+      if (botBtn) botBtn.onclick = () => socket.emit("addBot");
     }, 0);
   }
 
@@ -283,9 +311,10 @@ function renderLobby(isHost) {
   }
 
   const playerCards = state.players.map(p => `
-    <div class="chipCard">
-      <label>${escapeHtml(p.name)}</label>
+    <div class="chipCard ${p.isBot ? "botChipCard" : ""}">
+      <label>${escapeHtml(p.name)}${p.isBot ? " · BOT" : ""}</label>
       <input data-chip-player="${p.id}" value="${p.chips}" type="number" min="0" step="10" />
+      ${p.isBot ? `<button class="removeBotBtn" data-remove-bot="${p.id}">Remove Bot</button>` : ""}
     </div>
   `).join("");
 
@@ -306,10 +335,16 @@ function renderLobby(isHost) {
     };
   });
 
+  controls.querySelectorAll("[data-remove-bot]").forEach(btn => {
+    btn.onclick = () => socket.emit("removeBot", { botId: btn.dataset.removeBot });
+  });
+
   $("setAllBtn").onclick = () => {
     socket.emit("setAllChips", { chips: Number($("allChipAmount").value) });
   };
 }
+
+
 
 function renderCommunity() {
   const community = $("community");
@@ -342,6 +377,7 @@ function renderPlayers() {
       p.bet ? `<span class="badge bet">Bet ${p.bet}</span>` : "",
       p.allIn ? `<span class="badge allin">All-in</span>` : "",
       p.folded ? `<span class="badge">Fold</span>` : "",
+      p.isBot ? `<span class="badge botBadge">BOT</span>` : "",
       p.isYou ? `<span class="badge">You</span>` : "",
       p.chips <= 0 ? `<span class="badge bustedBadge">Spectating</span>` : "",
       p.isYou && p.currentScore && p.currentScore.rank >= 1 && !p.folded && state.phase !== "showdown" ? `<span class="badge handmadeBadge">${escapeHtml(p.currentScore.cn)}</span>` : ""
@@ -377,6 +413,21 @@ function renderPersonalHandHint() {
     lastPersonalScoreKey = key;
     showPersonalHandEffect(me.currentScore);
   }
+}
+
+
+function renderHistoryLog() {
+  const log = $("historyLog");
+  if (!log || !state) return;
+
+  const items = (state.history || []).slice(-10).reverse();
+  log.classList.toggle("hidden", !items.length);
+  log.innerHTML = `
+    <div class="historyLogTitle">LOG</div>
+    <div class="historyLogItems">
+      ${items.map(item => `<div class="historyLogItem history-${item.type || "action"}"><span>#${item.handNumber || 0}</span>${escapeHtml(item.text || "")}</div>`).join("")}
+    </div>
+  `;
 }
 
 function renderActions() {
@@ -443,16 +494,19 @@ function renderEmotes() {
   if (!bar) return;
   bar.classList.toggle("hidden", !state);
   bar.innerHTML = emotes.map(e => `<button type="button" class="emoteBtn" data-emote="${e}">${e}</button>`).join("");
+
   bar.querySelectorAll("[data-emote]").forEach(btn => {
     btn.onclick = (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
       playSound("emote");
       socket.emit("sendEmote", { emoji: btn.dataset.emote });
-      spawnEmoteBubble(btn.dataset.emote, "You");
+      // Do not spawn locally here. Server broadcast will show exactly one bubble.
     };
   });
 }
+
+
 
 
 
@@ -516,43 +570,74 @@ function showPersonalHandEffect(score) {
 
 function showShowdownEffect(winners, busted, finalWinner = null) {
   removeOverlay("showOverlay");
-  if (!winners.length) return;
+  winners = winners || [];
+  busted = busted || [];
 
-  const strongest = winners.reduce((a, b) => (b.rank > a.rank ? b : a), winners[0]);
-  const effect = strongest.effect || "highcard";
-  const title = finalWinner ? "FINAL WINNER" : (winners.length > 1 ? "SPLIT POT" : "SHOWDOWN");
-  const winLines = winners
-    .map(w => `<div class="cleanWinnerName">${escapeHtml(w.name)}</div><div class="cleanWinnerHand">${escapeHtml(w.handNameCn)} +${w.amount}</div>`)
-    .join("<br>");
-  const bustLines = busted.length
-    ? `<div class="roast">${busted.map(b => `${escapeHtml(b.name)} 爆仓观战`).join("<br>")}</div>`
-    : "";
-  const finalLine = finalWinner ? `<div class="finalLine">${escapeHtml(finalWinner.name)} 统治牌桌 · 最终筹码 ${finalWinner.chips}</div>` : "";
+  if (finalWinner && busted.length) {
+    showBustedThenFinal(winners, busted, finalWinner);
+    return;
+  }
 
-  playSound("showdown", strongest.rank);
-  if (busted.length) setTimeout(() => playSound("bust"), 420);
+  showFinalOrShowdown(winners, busted, finalWinner);
+}
+
+function showBustedThenFinal(winners, busted, finalWinner) {
+  playSound("bust");
+  const first = busted[0];
   const overlay = document.createElement("div");
   overlay.id = "showOverlay";
-  overlay.className = `showOverlay showdown effect-${effect} ${busted.length ? "has-bust" : ""} ${finalWinner ? "final-winner-mode" : ""}`;
+  overlay.className = "showOverlay showdown has-bust effect-foldwin";
   overlay.innerHTML = `
-    <div class="arenaFlash"></div>
-    ${bigEffectHTML(effect)}
-    ${busted.length ? bustedEffectHTML() : ""}
     <div class="showModal">
-      <div class="showTitle">${title}</div>
-      <div class="showDetails">${winLines}</div>
-      ${bustLines}
-      ${finalLine}
+      <div class="showTitle">BUSTED</div>
+      <div class="showDetails">${escapeHtml(first?.text || `${first?.name || "玩家"} 可以回家种地了`)}</div>
+      <div class="roast">${escapeHtml(first?.name || "玩家")} 可以回家种地了</div>
     </div>
   `;
-
   document.body.appendChild(overlay);
 
   setTimeout(() => {
-    overlay.style.animation = "overlayOut .85s ease both";
-    setTimeout(() => removeOverlay("showOverlay"), 850);
-  }, effect === "royal" ? 7600 : busted.length ? 6500 : 5600);
+    removeOverlay("showOverlay");
+    showFinalOrShowdown(winners, [], finalWinner);
+  }, 2300);
 }
+
+function showFinalOrShowdown(winners, busted, finalWinner = null) {
+  removeOverlay("showOverlay");
+  if (!winners.length && !finalWinner) return;
+
+  const strongest = winners.length
+    ? winners.reduce((a, b) => (b.rank > a.rank ? b : a), winners[0])
+    : { rank: 9, effect: "royal", handNameCn: "最终赢家" };
+
+  const effect = finalWinner ? "royal" : (strongest.effect || "highcard");
+  const title = finalWinner ? "FINAL WINNER" : (winners.length > 1 ? "SPLIT POT" : "SHOWDOWN");
+
+  const winLines = finalWinner
+    ? `<div class="cleanWinnerName">${escapeHtml(finalWinner.name)}</div><div class="cleanWinnerHand">最终赢家 · ${finalWinner.chips}</div>`
+    : winners.map(w => `<div class="cleanWinnerName">${escapeHtml(w.name)}</div><div class="cleanWinnerHand">${escapeHtml(w.handNameCn)} +${w.amount}</div>`).join("<br>");
+
+  const bustLines = (!finalWinner && busted.length)
+    ? `<div class="cleanBustedText">${busted.map(b => escapeHtml(b.text || `${b.name} 可以回家种地了`)).join("<br>")}</div>`
+    : "";
+
+  playSound("showdown", strongest.rank || 9);
+
+  const overlay = document.createElement("div");
+  overlay.id = "showOverlay";
+  overlay.className = `showOverlay showdown cleanShowOverlay effect-${effect}${(!finalWinner && busted.length) ? " has-bust" : ""}${finalWinner ? " final-winner" : ""}`;
+  overlay.innerHTML = `
+    <div class="showModal">
+      <div class="showTitle">${title}</div>
+      <div class="showDetails">${winLines}</div>
+      ${bustLines ? `<div class="roast">${bustLines}</div>` : ""}
+    </div>
+    <div class="confetti"></div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+
 
 function personalEffectHTML(effect) {
   if (effect === "onepair") return `<div class="ring mini"></div>`;

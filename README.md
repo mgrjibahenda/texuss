@@ -43,3 +43,49 @@ npm run test:public-final
 ```
 
 注意：这是朋友局/大众娱乐版，不是赌场级精确软件。
+
+
+## v21.1 Board Pair Display Fix
+
+Custom display rule requested:
+
+- If the public board itself has a pair/two pair/etc, do not display that as the player's own made hand.
+- Example:
+  - Board: Q♦ 5♠ 7♥ 4♦ 5♣
+  - Player: A♦ 4♣
+  - Real poker best hand: two pair, 5s and 4s
+  - Game display: one pair, 4s
+
+Important:
+- Winner calculation still uses normal poker best hand.
+- This change affects displayed hand name/currentScore so public board pairs do not look like they belong to the player.
+
+
+## v22 Replit-Style Lobby + Final Winner Effect
+
+Changes:
+
+- Main page changed to the dark-green minimal Replit-style lobby shown in the reference screenshots.
+- Main menu now has:
+  - 创建房间
+  - 加入房间
+- Create and Join are separated into clean panels.
+- Preview Effects remains removed.
+- Last busted player no longer triggers busted effect if the game reaches FINAL WINNER.
+- Final Winner effect is the only ending effect in the final elimination hand.
+
+
+## v23.1 Bot Button + Emote Duplicate Fix
+
+Fixes:
+
+- Host can now clearly see Add Bot in lobby.
+- Bot player cards show BOT and can be removed in lobby.
+- Clicking one emoji now shows exactly one bubble:
+  - local instant bubble removed
+  - server broadcast handles the display
+- Left-top LOG records actions.
+- If the final player busts:
+  - busted/death effect plays first
+  - then FINAL WINNER effect plays
+  - they do not overlap

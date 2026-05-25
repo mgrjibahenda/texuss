@@ -43,6 +43,54 @@ function displayScore(score) {
   };
 }
 
+function displayPersonalScore(holeCards, communityCards) {
+  if (!holeCards || holeCards.length !== 2 || !communityCards || communityCards.length < 3) return null;
+
+  const actual = evaluateSeven([...holeCards, ...communityCards]);
+  const boardOnly = communityCards.length >= 5 ? evaluateSeven(communityCards) : null;
+
+  // Public board-made hand should not be shown as the player's own made hand.
+  // Example: board has 5♠ 5♣, player has A♦ 4♣ with board 4♦.
+  // Real poker best hand is two pair, but personal display is one pair 4.
+  if (boardOnly && compareScore(actual, boardOnly) <= 0) return null;
+
+  const counts = {};
+  for (const c of [...holeCards, ...communityCards]) {
+    const v = RANK_VALUE[c.rank];
+    counts[v] = (counts[v] || 0) + 1;
+  }
+
+  const holeValues = holeCards.map(c => RANK_VALUE[c.rank]);
+  const personalPairs = [...new Set(holeValues)]
+    .filter(v => counts[v] >= 2)
+    .sort((a, b) => b - a);
+
+  if (personalPairs.length >= 2) {
+    return {
+      rank: 2,
+      name: "Two Pair",
+      cn: "两对",
+      effect: "twopair",
+      tiebreak: personalPairs.slice(0, 2)
+    };
+  }
+
+  if (personalPairs.length === 1) {
+    const v = personalPairs[0];
+    if (counts[v] >= 4) return { rank: 7, name: "Four of a Kind", cn: "四条", effect: "fourkind", tiebreak: [v] };
+    if (counts[v] >= 3) return { rank: 3, name: "Three of a Kind", cn: "三条", effect: "threekind", tiebreak: [v] };
+    return { rank: 1, name: "One Pair", cn: "一对", effect: "onepair", tiebreak: [v] };
+  }
+
+  // For straights/flushes/full houses that genuinely require the player's hole cards,
+  // keep the true hand name, because it is not merely a public board pair.
+  if (actual.rank >= 4) return actual;
+
+  return null;
+}
+
+
+
 function makeDeck() {
   const deck = [];
   for (const suit of SUITS) {
@@ -72,7 +120,8 @@ function createRoom(hostId, hostName) {
       folded: false,
       allIn: false,
       connected: true,
-      lastScore: null
+      lastScore: null,
+      isBot: false
     }],
     started: false,
     deck: [],
@@ -92,12 +141,93 @@ function createRoom(hostId, hostName) {
     finalWinner: null,
     handNumber: 0,
     lastAction: "",
-    emotes: []
+    emotes: [],
+    history: [],
+    botTimer: null
   };
 
   rooms.set(code, room);
   return room;
 }
+
+
+function logHistory(room, text, type = "action") {
+  if (!room.history) room.history = [];
+  room.history.push({
+    id: Date.now() + "-" + Math.floor(Math.random() * 1000000),
+    handNumber: room.handNumber || 0,
+    phase: room.phase,
+    type,
+    text,
+    ts: Date.now()
+  });
+  room.history = room.history.slice(-80);
+}
+
+function botName(room) {
+  const taken = new Set(room.players.map(p => p.name));
+  const names = ["Bot 阿豪", "Bot 老王", "Bot 小李", "Bot Lucky", "Bot Shark", "Bot 007"];
+  for (const n of names) if (!taken.has(n)) return n;
+  return "Bot " + Math.floor(100 + Math.random() * 900);
+}
+
+function currentPlayer(room) {
+  return room.players[room.turnIndex];
+}
+
+function shouldAutoBot(room) {
+  const p = currentPlayer(room);
+  return p && p.isBot && !["lobby", "showdown"].includes(room.phase) && !p.folded && !p.allIn && p.chips > 0;
+}
+
+function scheduleBotTurn(room) {
+  if (!shouldAutoBot(room)) return;
+  if (room.botTimer) return;
+  room.botTimer = setTimeout(() => {
+    room.botTimer = null;
+    performBotAction(room);
+  }, 650 + Math.floor(Math.random() * 450));
+}
+
+function performBotAction(room) {
+  if (!shouldAutoBot(room)) return;
+
+  const player = currentPlayer(room);
+  const callAmount = Math.max(0, room.currentBet - player.bet);
+  let actionText = "";
+
+  if (callAmount === 0) {
+    if (player.chips > room.bigBlind * 4 && Math.random() < 0.14) {
+      const target = Math.min(player.bet + player.chips, room.currentBet + room.bigBlind);
+      takeChips(player, target - player.bet);
+      room.currentBet = Math.max(room.currentBet, player.bet);
+      room.actedThisRound = new Set([player.id]);
+      actionText = `${player.name} raises to ${player.bet}.`;
+    } else {
+      room.actedThisRound.add(player.id);
+      actionText = `${player.name} checks.`;
+    }
+  } else if (callAmount >= player.chips) {
+    takeChips(player, player.chips);
+    room.actedThisRound.add(player.id);
+    actionText = `${player.name} goes all-in.`;
+  } else if (callAmount <= Math.max(room.bigBlind * 3, player.chips * 0.25)) {
+    const paid = takeChips(player, callAmount);
+    room.actedThisRound.add(player.id);
+    actionText = `${player.name} calls ${paid}.`;
+  } else {
+    player.folded = true;
+    room.actedThisRound.add(player.id);
+    actionText = `${player.name} folds.`;
+  }
+
+  room.lastAction = actionText;
+  room.message = actionText;
+  logHistory(room, actionText, "bot");
+  afterAction(room);
+  emitRoom(room);
+}
+
 
 function publicRoom(room, viewerId) {
   return {
@@ -120,9 +250,11 @@ function publicRoom(room, viewerId) {
     handNumber: room.handNumber,
     lastAction: room.lastAction,
     emotes: room.emotes || [],
+    history: room.history || [],
     players: room.players.map((p, idx) => ({
       id: p.id,
       name: p.name,
+      isBot: !!p.isBot,
       chips: p.chips,
       bet: p.bet,
       totalCommitted: p.totalCommitted,
@@ -135,7 +267,7 @@ function publicRoom(room, viewerId) {
       seat: idx,
       isYou: p.id === viewerId,
       currentScore: p.id === viewerId && !p.folded && p.hand.length === 2 && room.community.length >= 3
-        ? displayScore(evaluateSeven([...p.hand, ...room.community]))
+        ? displayScore(displayPersonalScore(p.hand, room.community))
         : null
     }))
   };
@@ -143,9 +275,12 @@ function publicRoom(room, viewerId) {
 
 function emitRoom(room) {
   for (const p of room.players) {
-    io.to(p.id).emit("state", publicRoom(room, p.id));
+    if (!p.isBot) io.to(p.id).emit("state", publicRoom(room, p.id));
   }
+  scheduleBotTurn(room);
 }
+
+
 
 function nextSeatedWithChips(room, fromIndex) {
   const n = room.players.length;
@@ -203,6 +338,8 @@ function startHand(room) {
   room.busted = [];
   room.finalWinner = null;
   room.lastAction = "";
+  if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; }
+  room.history = room.history || [];
 
   for (const p of room.players) {
     p.hand = [];
@@ -239,6 +376,7 @@ function startHand(room) {
 
   room.message = `${sb.name} posts small blind, ${bb.name} posts big blind.`;
   room.lastAction = `Hand ${room.handNumber} begins.`;
+  logHistory(room, `Hand ${room.handNumber} begins. ${sb.name} posts small blind, ${bb.name} posts big blind.`, "start");
 }
 
 function allBetsMatchedOrAllIn(room) {
@@ -279,6 +417,7 @@ function runOutBoardAndFinish(room) {
   }
   room.lastAction = "All-in runout complete.";
   room.message = room.lastAction;
+  logHistory(room, room.lastAction, "deal");
   return finishHand(room);
 }
 
@@ -306,6 +445,7 @@ function endBettingRound(room) {
   }
 
   room.message = room.lastAction;
+  logHistory(room, room.lastAction, "deal");
   room.turnIndex = nextIndex(room, room.dealerIndex);
   if (room.turnIndex < 0) return finishHand(room);
 }
@@ -354,25 +494,30 @@ function finishHand(room) {
         winners.push(p);
       }
     }
-    room.message = `${winners.map(w => w.name).join(", ")} win with ${best.cn}.`;
+    const shownBest = winners.length === 1 ? (displayPersonalScore(winners[0].hand, room.community) || best) : best;
+    room.message = `${winners.map(w => w.name).join(", ")} win with ${shownBest.cn}.`;
   }
 
   const share = Math.floor(room.pot / winners.length);
   for (const w of winners) w.chips += share;
 
-  room.winners = winners.map(w => ({
-    id: w.id,
-    name: w.name,
-    amount: share,
-    handName: w.lastScore?.name || "Fold Win",
-    handNameCn: w.lastScore?.cn || "弃牌胜利",
-    effect: w.lastScore?.effect || "foldwin",
-    rank: w.lastScore?.rank ?? -1
-  }));
+  room.winners = winners.map(w => {
+    const personalScore = displayPersonalScore(w.hand, room.community);
+    const shownScore = personalScore || w.lastScore;
+    return {
+      id: w.id,
+      name: w.name,
+      amount: share,
+      handName: shownScore?.name || "Fold Win",
+      handNameCn: shownScore?.cn || "弃牌胜利",
+      effect: shownScore?.effect || "foldwin",
+      rank: shownScore?.rank ?? -1
+    };
+  });
 
   room.busted = room.players
     .filter(p => p.chips <= 0 && !winners.some(w => w.id === p.id))
-    .map(p => ({ id: p.id, name: p.name }));
+    .map(p => ({ id: p.id, name: p.name, text: `${p.name} 可以回家种地了` }));
 
   const survivors = room.players.filter(p => p.chips > 0);
   if (survivors.length === 1 && room.players.length > 1) {
@@ -386,6 +531,7 @@ function finishHand(room) {
     room.finalWinner = null;
   }
 
+  logHistory(room, room.message, room.finalWinner ? "final" : "showdown");
   room.pot = 0;
   room.lastAction = room.finalWinner ? "Final winner decided." : "Showdown complete.";
 
@@ -546,7 +692,8 @@ io.on("connection", (socket) => {
       folded: false,
       allIn: false,
       connected: true,
-      lastScore: null
+      lastScore: null,
+      isBot: false
     });
 
     socket.join(room.code);
@@ -584,6 +731,49 @@ io.on("connection", (socket) => {
       p.allIn = false;
     }
     room.message = `Everyone's stack set to ${amount}.`;
+    emitRoom(room);
+  });
+
+
+  socket.on("addBot", () => {
+    const found = findPlayerRoom(socket.id);
+    if (!found) return;
+    const { room } = found;
+    if (room.hostId !== socket.id || room.phase !== "lobby") return;
+    if (room.players.length >= 8) return;
+
+    const bot = {
+      id: "bot-" + Date.now() + "-" + Math.floor(Math.random() * 1000000),
+      name: botName(room),
+      chips: 1000,
+      bet: 0,
+      totalCommitted: 0,
+      hand: [],
+      folded: false,
+      allIn: false,
+      connected: true,
+      lastScore: null,
+      isBot: true
+    };
+
+    room.players.push(bot);
+    logHistory(room, `${bot.name} joined as bot.`, "host");
+    emitRoom(room);
+  });
+
+  socket.on("removeBot", ({ botId }) => {
+    const found = findPlayerRoom(socket.id);
+    if (!found) return;
+    const { room } = found;
+    if (room.hostId !== socket.id || room.phase !== "lobby") return;
+
+    const idx = room.players.findIndex(p => p.id === botId && p.isBot);
+    if (idx < 0) return;
+
+    const name = room.players[idx].name;
+    room.players.splice(idx, 1);
+    if (room.dealerIndex >= room.players.length) room.dealerIndex = 0;
+    logHistory(room, `${name} removed.`, "host");
     emitRoom(room);
   });
 
@@ -643,6 +833,7 @@ io.on("connection", (socket) => {
     }
 
     room.message = room.lastAction;
+    logHistory(room, room.lastAction, "action");
     afterAction(room);
     emitRoom(room);
   });
