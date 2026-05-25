@@ -154,13 +154,26 @@ const emotes = ["😂","😭","😎","🤡","💀","🔥","😡","🙏","💸","
 
 
 
+function showLoginPanel(panelId) {
+  ["mainMenuPanel", "createPanel", "joinPanel"].forEach(id => {
+    const el = $(id);
+    if (el) el.classList.toggle("hidden", id !== panelId);
+  });
+  $("loginError").textContent = "";
+}
+
+$("createModeBtn").onclick = () => showLoginPanel("createPanel");
+$("joinModeBtn").onclick = () => showLoginPanel("joinPanel");
+$("backFromCreate").onclick = () => showLoginPanel("mainMenuPanel");
+$("backFromJoin").onclick = () => showLoginPanel("mainMenuPanel");
+
 $("createBtn").onclick = () => {
   const name = $("name").value.trim() || "Player";
   socket.emit("createRoom", { name }, handleJoinResponse);
 };
 
 $("joinBtn").onclick = () => {
-  const name = $("name").value.trim() || "Player";
+  const name = ($("joinName")?.value || $("name")?.value || "").trim() || "Player";
   const code = $("roomCode").value.trim();
   socket.emit("joinRoom", { name, code }, handleJoinResponse);
 };
@@ -177,6 +190,11 @@ $("soundToggle").onclick = () => {
     playSound("chip");
   }
 };
+
+
+$("roomCode").addEventListener("input", () => {
+  $("roomCode").value = $("roomCode").value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
+});
 
 function handleJoinResponse(res) {
   if (!res.ok) {
@@ -218,7 +236,7 @@ function render() {
 
   if (state.phase === "showdown" && showdownKey && showdownKey !== lastShowdownKey) {
     lastShowdownKey = showdownKey;
-    showShowdownEffect(state.winners || [], state.busted || [], state.finalWinner);
+    showShowdownEffect(state.winners || [], state.finalWinner ? [] : (state.busted || []), state.finalWinner);
   }
   if (state.phase !== "showdown") {
     lastShowdownKey = "";
@@ -515,6 +533,7 @@ function showPersonalHandEffect(score) {
 }
 
 function showShowdownEffect(winners, busted, finalWinner = null) {
+  if (finalWinner) busted = [];
   removeOverlay("showOverlay");
   if (!winners.length) return;
 

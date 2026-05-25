@@ -1,11 +1,13 @@
 {
-  "name": "texas-holdem-public-final",
-  "version": "21.0.0",
-  "description": "Public playable Texas Hold'em based on stable v8 flow with safe final optimizations.",
+  "name": "texas-holdem-public-final-v22-replit-style",
+  "version": "22.0.0",
+  "description": "Public final Texas Hold'em with Replit-style lobby and final-winner-only ending effect.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test:public-final": "node tests/public-final-test.js"
+    "test:public-final": "node tests/public-final-test.js",
+    "test:boardpair": "node tests/boardpair-display-test.js",
+    "test:v22": "node tests/v22-style-finalwinner-test.js"
   },
   "dependencies": {
     "express": "^4.18.3",
