@@ -107,3 +107,49 @@ npm run test:hands
 - 加入 `npm run test:core-static` 静态核心规则检查。
 
 注意：这仍然是朋友局网页游戏，不是赌场级软件。
+
+
+## v16 Debug + Test Edition
+
+新增内容：
+
+- 房主 Debug Panel：
+  - phase
+  - turnIndex / 当前行动玩家
+  - dealer
+  - pot / currentBet / minRaise
+  - 公共牌数量
+  - ableToAct
+  - 每个玩家 chips / bet / totalCommitted / folded / allIn / actedThisRound / canAct
+
+- Hand History：
+  - 每手开始
+  - blinds
+  - actions
+  - flop / turn / river
+  - showdown
+  - side pot breakdown
+  - final winner
+  - host 操作
+
+- 房主控制：
+  - Cancel Hand：取消当前手牌并返还 committed chips
+  - Kick player
+  - Set Dealer
+  - Set Blinds
+  - Clear Logs
+
+- 前端操作原因提示：
+  - Not your turn
+  - You folded
+  - You are all-in
+  - Hand is over
+  - Waiting in lobby
+  - Server rejected action reason
+
+- 测试：
+```bash
+npm run test:v16
+npm run test:core-static
+npm run test:hands
+```

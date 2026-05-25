@@ -1,0 +1,20 @@
+{
+  "name": "texas-holdem-v16-debug-test",
+  "version": "16.0.0",
+  "description": "Texas Hold'em Stable Pro with debug panel, hand history, host controls, and tests.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test:hands": "node tests/hand-evaluator-smoke-test.js",
+    "test:hardfix": "node tests/rule-hardfix-static-test.js",
+    "test:core-static": "node tests/core-static-test.js",
+    "test:v16": "node tests/v16-static-test.js"
+  },
+  "dependencies": {
+    "express": "^4.18.3",
+    "socket.io": "^4.7.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
