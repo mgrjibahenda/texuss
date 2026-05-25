@@ -1,6 +1,7 @@
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
+const crypto = require("crypto");
 
 const app = express();
 const server = http.createServer(app);
@@ -17,7 +18,7 @@ const RANK_VALUE = Object.fromEntries(RANKS.map((r, i) => [r, i + 2]));
 function makeRoomCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
-  for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 5; i++) code += chars[crypto.randomInt(chars.length)];
   return code;
 }
 
@@ -49,7 +50,7 @@ function makeDeck() {
     for (const rank of RANKS) deck.push({ rank, suit, code: rank + suit });
   }
   for (let i = deck.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = crypto.randomInt(i + 1);
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
   return deck;
@@ -518,10 +519,23 @@ io.on("connection", (socket) => {
     const p = room.players.find(x => x.id === playerId);
     const amount = Math.max(0, Math.min(999999, Math.floor(Number(chips))));
     if (!p || !Number.isFinite(amount)) return;
+
     p.chips = amount;
     p.bet = 0;
     p.totalCommitted = 0;
+    p.hand = [];
+    p.folded = false;
+    p.allIn = false;
+    p.lastScore = null;
+    p.connected = true;
+
+    room.finalWinner = null;
+    room.busted = [];
+    room.winners = [];
+    room.pot = 0;
+    room.currentBet = 0;
     room.message = `${p.name}'s stack set to ${amount}.`;
+    room.lastAction = "Stack updated.";
     emitRoom(room);
   });
 
@@ -532,14 +546,25 @@ io.on("connection", (socket) => {
     if (room.hostId !== socket.id || room.phase !== "lobby") return;
     const amount = Math.max(0, Math.min(999999, Math.floor(Number(chips))));
     if (!Number.isFinite(amount)) return;
+
     for (const p of room.players) {
       p.chips = amount;
       p.bet = 0;
       p.totalCommitted = 0;
+      p.hand = [];
       p.folded = false;
       p.allIn = false;
+      p.lastScore = null;
+      p.connected = true;
     }
+
+    room.finalWinner = null;
+    room.busted = [];
+    room.winners = [];
+    room.pot = 0;
+    room.currentBet = 0;
     room.message = `Everyone's stack set to ${amount}.`;
+    room.lastAction = "All stacks updated.";
     emitRoom(room);
   });
 
@@ -628,24 +653,29 @@ io.on("connection", (socket) => {
     if (!found) return;
     const { room } = found;
     if (room.hostId !== socket.id || !room.finalWinner) return;
+
     for (const p of room.players) {
       p.hand = [];
       p.bet = 0;
       p.totalCommitted = 0;
-      p.folded = p.chips <= 0;
+      p.folded = false;
       p.allIn = false;
       p.lastScore = null;
+      p.connected = true;
     }
+
     room.started = false;
     room.phase = "lobby";
     room.deck = [];
     room.community = [];
     room.pot = 0;
     room.currentBet = 0;
+    room.minRaise = room.bigBlind;
+    room.actedThisRound = new Set();
     room.winners = [];
     room.busted = [];
     room.finalWinner = null;
-    room.message = "Back to room. Dealer can reset stacks for another game.";
+    room.message = "Back to room. Set stacks, then start a new game.";
     room.lastAction = "Returned to lobby.";
     emitRoom(room);
   });
@@ -684,5 +714,5 @@ io.on("connection", (socket) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Texas Hold'em v4 premium plus running at http://localhost:${PORT}`);
+  console.log(`Texas Hold'em v12 gamefeel running at http://localhost:${PORT}`);
 });

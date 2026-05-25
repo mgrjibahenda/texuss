@@ -1,38 +1,63 @@
-# Texas Hold'em v11 Three.js Cinematic
+# Texas Hold'em v12 Gamefeel
 
-## v11 真 3D 大招升级
+## 这版修了什么
 
-这版不是单纯“粒子变多”，而是新增了 Three.js 3D 场景：
+### 1. 牌不公平/好牌太多的问题
 
-- 3D 牌桌模型
-- 牌桌旋转
-- 镜头 zoom in / zoom out
-- 镜头环绕
-- 慢动作定格
-- 屏幕震动
-- 3D 扑克牌飞出并在空中展开
-- 3D 筹码喷射和落桌反弹
-- 3D 能量环
-- 3D 光照和发光材质
-- 皇家同花顺有 3D 皇冠
-- 顺子 / 同花顺有 3D 电光线
-- 破产有红色桌面裂痕和碎片爆炸
+- 发牌逻辑仍然是一副 52 张牌、每张牌只会出现一次。
+- 洗牌改成 Node.js `crypto.randomInt()` 的 Fisher-Yates 洗牌。
+- 这比 `Math.random()` 更适合做公平随机。
+- 概率和现实德州扑克一样，不会人为提高好牌概率。
+- 你觉得好牌多，主要原因通常是：玩家少、每局都看到公共牌、preview/短局样本小，会让高牌型更显眼。
 
-同时保留 v10 的 Canvas 粒子层和 CSS 全屏特效，所以现在是三层叠加：
+### 2. Final winner 回房间卡住的问题
 
-1. Three.js 3D 镜头与物体
-2. Canvas 粒子/闪电/筹码
-3. CSS 全屏文字/皇冠/裂屏/光柱
+- 修复 `Back to Room` 后破产玩家仍然处在 folded/all-in 状态的问题。
+- 现在回房间后 dealer 可以重新设置所有人的筹码。
+- 设置破产玩家筹码后可以正常开始下一局。
+- `Set All` 也会彻底清理 busted/finalWinner 状态。
 
-## 注意
+### 3. 特效持续时间太短
 
-Three.js 通过 CDN 加载：
+- 结算特效时间加长：
+  - 普通结算约 9.3 秒
+  - 破产约 10.5 秒
+  - 同花顺约 10.8 秒
+  - 皇家同花顺约 11.5 秒
+  - Final Winner 约 12.5 秒
 
-```html
-https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js
-```
+### 4. 声音和 BGM
 
-如果某些网络环境加载 CDN 失败，游戏仍然能跑，只是会退回 Canvas + CSS 特效。
+- 背景音乐仍是 Web Audio 实时生成，但比之前更像游戏氛围：
+  - 低频 bass
+  - pad 和弦
+  - 节奏 pulse
+  - 结算时音乐强度会切换 mood
+- 每个牌型有不同音效：
+  - 一对：轻筹码
+  - 两对：双击和筹码
+  - 三条：三次重击
+  - 顺子：riser + 闪电冲击
+  - 同花：水波音 + 和弦
+  - 葫芦：金色和弦 + 筹码雨
+  - 四条：多次重击 + 低频冲击
+  - 同花顺：riser + 激光音阶
+  - 皇家同花顺：最高级皇冠和弦 + 金色爆炸 + 筹码雨
+  - 破产：低频爆炸 + 噪声塌陷
+
+### 5. 真 3D 大招更明显
+
+- 3D 筹码数量提高。
+- 3D 碎片数量提高。
+- 镜头 zoom 更明显。
+- 牌桌旋转更明显。
+- 慢动作时间变长。
+- 如果 Three.js 没加载成功，会在屏幕顶部提示 `3D engine not loaded`，这样不会再误以为 3D 生效了。
+
+## 关于真正游戏音乐/音效素材
+
+这一版没有内置外部 mp3/wav，因为不能随便打包有版权的游戏音乐。  
+建议后续使用 CC0/royalty-free 音效库，例如 Kenney、OpenGameArt、Pixabay 等，然后把音频放进 `public/audio/` 再接入。
 
 ## Render 设置
 
@@ -47,5 +72,3 @@ Start Command:
 ```bash
 npm start
 ```
-
-上传覆盖 GitHub 仓库后，Render 会自动重新部署。

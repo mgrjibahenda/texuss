@@ -1,7 +1,7 @@
 {
-  "name": "texas-holdem-v11-three-cinematic",
-  "version": "11.0.0",
-  "description": "Texas Hold'em v11 with Three.js 3D cinematic winner effects.",
+  "name": "texas-holdem-v12-gamefeel",
+  "version": "12.0.0",
+  "description": "Texas Hold'em v12: fair shuffle, fixed final-winner lobby reset, longer 3D cinematics, tiered effect-specific music and SFX.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

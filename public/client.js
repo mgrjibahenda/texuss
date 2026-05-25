@@ -9,6 +9,8 @@ let audioCtx = null;
 let lastSoundPhaseKey = "";
 let lastActionSound = "";
 let musicNodes = null;
+let musicPulseTimer = null;
+let currentMusicMood = "lobby";
 
 const $ = (id) => document.getElementById(id);
 
@@ -56,36 +58,62 @@ function noise(duration = 0.18, gain = 0.08, delay = 0, filterFreq = 900) {
 }
 
 
+
+function setMusicMood(mood = "lobby") {
+  currentMusicMood = mood;
+  if (!musicNodes?.master || !audioCtx) return;
+  const ctx = getAudio();
+  const target = mood === "royal" ? 0.070 :
+    mood === "straightflush" ? 0.060 :
+    mood === "bust" ? 0.066 :
+    mood === "showdown" ? 0.055 :
+    mood === "hand" ? 0.045 :
+    0.035;
+  musicNodes.master.gain.cancelScheduledValues(ctx.currentTime);
+  musicNodes.master.gain.setTargetAtTime(target, ctx.currentTime, 0.25);
+}
+
 function startBackgroundMusic() {
   if (!soundEnabled || musicNodes) return;
   const ctx = getAudio();
+
   const master = ctx.createGain();
   master.gain.setValueAtTime(0.035, ctx.currentTime);
   master.connect(ctx.destination);
+
+  const lowpass = ctx.createBiquadFilter();
+  lowpass.type = "lowpass";
+  lowpass.frequency.setValueAtTime(900, ctx.currentTime);
+  lowpass.Q.setValueAtTime(0.7, ctx.currentTime);
+  lowpass.connect(master);
 
   const bass = ctx.createOscillator();
   const bassGain = ctx.createGain();
   bass.type = "sine";
   bass.frequency.setValueAtTime(55, ctx.currentTime);
-  bassGain.gain.setValueAtTime(0.12, ctx.currentTime);
+  bassGain.gain.setValueAtTime(0.26, ctx.currentTime);
   bass.connect(bassGain);
-  bassGain.connect(master);
+  bassGain.connect(lowpass);
 
   const pad1 = ctx.createOscillator();
   const pad2 = ctx.createOscillator();
+  const pad3 = ctx.createOscillator();
   const padGain = ctx.createGain();
   pad1.type = "triangle";
   pad2.type = "sine";
+  pad3.type = "sine";
   pad1.frequency.setValueAtTime(220, ctx.currentTime);
   pad2.frequency.setValueAtTime(277.18, ctx.currentTime);
-  padGain.gain.setValueAtTime(0.05, ctx.currentTime);
+  pad3.frequency.setValueAtTime(329.63, ctx.currentTime);
+  padGain.gain.setValueAtTime(0.065, ctx.currentTime);
   pad1.connect(padGain);
   pad2.connect(padGain);
-  padGain.connect(master);
+  pad3.connect(padGain);
+  padGain.connect(lowpass);
 
   const lfo = ctx.createOscillator();
   const lfoGain = ctx.createGain();
-  lfo.frequency.setValueAtTime(0.08, ctx.currentTime);
+  lfo.frequency.setValueAtTime(0.055, ctx.currentTime);
   lfoGain.gain.setValueAtTime(0.018, ctx.currentTime);
   lfo.connect(lfoGain);
   lfoGain.connect(master.gain);
@@ -93,68 +121,171 @@ function startBackgroundMusic() {
   bass.start();
   pad1.start();
   pad2.start();
+  pad3.start();
   lfo.start();
 
-  // Soft casino pulse loop.
-  const pulse = setInterval(() => {
+  let step = 0;
+  const bassNotes = [55, 55, 65.41, 49, 55, 73.42, 65.41, 49];
+  musicPulseTimer = setInterval(() => {
     if (!soundEnabled || !audioCtx) return;
-    tone(440, 0.035, "triangle", 0.012);
-    tone(660, 0.04, "sine", 0.009, 0.12);
-  }, 3600);
+    const ctx = getAudio();
+    const note = bassNotes[step % bassNotes.length];
+    bass.frequency.setTargetAtTime(note, ctx.currentTime, 0.08);
 
-  musicNodes = { master, bass, pad1, pad2, lfo, pulse };
+    // Subtle casino/game pulse. Higher mood adds more arpeggio.
+    const moodBoost = ["showdown", "royal", "straightflush", "bust"].includes(currentMusicMood);
+    tone(440 + (step % 4) * 55, 0.035, "triangle", moodBoost ? 0.018 : 0.010, 0);
+    if (moodBoost) tone(660 + (step % 5) * 33, 0.055, "sine", 0.014, 0.11);
+    step += 1;
+  }, 520);
+
+  musicNodes = { master, lowpass, bass, pad1, pad2, pad3, lfo, pulse: musicPulseTimer };
 }
 
-function playSound(name, rank = 0) {
+function chord(freqs, dur = 0.45, type = "sine", gain = 0.035, delay = 0) {
+  freqs.forEach((f, i) => tone(f, dur, type, gain * (0.92 - i * 0.06), delay + i * 0.015));
+}
+
+function riser(startFreq, endFreq, dur = 0.9, type = "sawtooth", gain = 0.035, delay = 0) {
+  if (!soundEnabled) return;
+  const ctx = getAudio();
+  const osc = ctx.createOscillator();
+  const vol = ctx.createGain();
+  const filter = ctx.createBiquadFilter();
+  osc.type = type;
+  osc.frequency.setValueAtTime(startFreq, ctx.currentTime + delay);
+  osc.frequency.exponentialRampToValueAtTime(endFreq, ctx.currentTime + delay + dur);
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(700, ctx.currentTime + delay);
+  filter.frequency.exponentialRampToValueAtTime(4500, ctx.currentTime + delay + dur);
+  vol.gain.setValueAtTime(0.0001, ctx.currentTime + delay);
+  vol.gain.exponentialRampToValueAtTime(gain, ctx.currentTime + delay + 0.08);
+  vol.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + dur);
+  osc.connect(filter);
+  filter.connect(vol);
+  vol.connect(ctx.destination);
+  osc.start(ctx.currentTime + delay);
+  osc.stop(ctx.currentTime + delay + dur + 0.05);
+}
+
+function impact(power = 1, delay = 0) {
+  noise(0.18 + power * 0.08, 0.045 + power * 0.018, delay, 420 + power * 140);
+  tone(52 + power * 6, 0.22 + power * 0.04, "sawtooth", 0.045 + power * 0.012, delay);
+  tone(96 + power * 18, 0.15, "square", 0.025, delay + 0.04);
+}
+
+function coinCascade(count = 8, delay = 0) {
+  for (let i = 0; i < count; i++) {
+    tone(760 + Math.random() * 740, 0.035 + Math.random() * 0.04, "square", 0.010 + Math.random() * 0.012, delay + i * 0.035);
+  }
+  noise(0.15, 0.018, delay + 0.05, 3600);
+}
+
+function playEffectSound(effect, rank = 0, finalWinner = false) {
+  if (!soundEnabled) return;
+  const r = Math.max(0, rank);
+  const power = Math.max(1, r);
+
+  setMusicMood(finalWinner ? "royal" : effect);
+
+  if (effect === "royal") {
+    riser(160, 1600, 1.25, "sawtooth", 0.045, 0);
+    chord([523.25, 659.25, 783.99, 1046.50], 1.15, "sine", 0.052, 0.55);
+    chord([1046.5, 1318.5, 1568, 2093], 1.5, "triangle", 0.048, 1.05);
+    coinCascade(34, 0.35);
+    impact(4.8, 1.10);
+    noise(0.9, 0.045, 1.15, 5200);
+  } else if (effect === "straightflush") {
+    riser(220, 1320, 0.95, "sawtooth", 0.038, 0);
+    chord([392, 493.88, 587.33, 783.99], 0.9, "triangle", 0.045, 0.55);
+    for (let i = 0; i < 9; i++) tone(620 + i * 95, 0.06, "sine", 0.021, 0.16 + i * 0.07);
+    impact(3.6, 0.86);
+  } else if (effect === "fourkind") {
+    impact(3.2, 0);
+    impact(3.4, 0.24);
+    impact(3.8, 0.48);
+    chord([196, 246.94, 293.66, 392], 0.75, "sawtooth", 0.038, 0.68);
+    coinCascade(22, 0.42);
+  } else if (effect === "fullhouse") {
+    chord([220, 277.18, 329.63], 0.55, "triangle", 0.038, 0);
+    chord([329.63, 415.30, 493.88], 0.75, "sine", 0.043, 0.36);
+    coinCascade(20, 0.30);
+    impact(2.6, 0.72);
+  } else if (effect === "flush") {
+    noise(0.65, 0.030, 0, 1800);
+    for (let i = 0; i < 8; i++) tone(330 + i * 55, 0.12, "sine", 0.020, i * 0.08);
+    chord([440, 554.37, 659.25], 0.8, "triangle", 0.034, 0.45);
+  } else if (effect === "straight") {
+    riser(180, 920, 0.65, "sawtooth", 0.032, 0);
+    for (let i = 0; i < 5; i++) tone(260 + i * 120, 0.075, "square", 0.030, i * 0.075);
+    impact(2.2, 0.48);
+    noise(0.28, 0.055, 0.50, 2400);
+  } else if (effect === "threekind") {
+    impact(1.8, 0);
+    impact(1.9, 0.18);
+    impact(2.0, 0.36);
+    chord([261.63, 329.63, 392], 0.55, "triangle", 0.030, 0.48);
+  } else if (effect === "twopair") {
+    chord([330, 415.30], 0.18, "square", 0.028, 0);
+    chord([392, 493.88], 0.22, "square", 0.030, 0.22);
+    coinCascade(10, 0.18);
+  } else if (effect === "onepair") {
+    tone(392, 0.10, "triangle", 0.028, 0);
+    tone(523.25, 0.14, "triangle", 0.025, 0.13);
+    coinCascade(6, 0.05);
+  } else if (effect === "bust" || effect === "foldwin") {
+    impact(3.2, 0);
+    riser(130, 48, 0.75, "sawtooth", 0.050, 0.05);
+    noise(0.75, 0.100, 0.10, 620);
+    tone(75, 0.65, "sawtooth", 0.080, 0.18);
+  } else {
+    chord([260 + power * 40, 390 + power * 40], 0.28, "triangle", 0.030, 0);
+    coinCascade(7, 0.1);
+  }
+
+  if (finalWinner) {
+    setTimeout(() => {
+      riser(180, 1800, 1.05, "sawtooth", 0.045, 0);
+      chord([523.25, 659.25, 783.99, 1046.50, 1318.5], 1.4, "sine", 0.050, 0.65);
+      impact(4.0, 0.95);
+      coinCascade(42, 0.7);
+    }, 700);
+  }
+}
+
+function playSound(name, rank = 0, effect = null, finalWinner = false) {
   if (!soundEnabled) return;
   try {
     if (name === "deal") {
-      noise(0.06, 0.035, 0, 1800);
-      tone(520, 0.045, "triangle", 0.025, 0.02);
+      noise(0.055, 0.030, 0, 2200);
+      tone(560, 0.045, "triangle", 0.020, 0.015);
     } else if (name === "chip") {
-      tone(620, 0.055, "square", 0.025);
-      tone(920, 0.07, "square", 0.018, 0.045);
-      noise(0.08, 0.02, 0.02, 2500);
+      coinCascade(4, 0);
     } else if (name === "fold") {
-      tone(220, 0.13, "sawtooth", 0.035);
-      noise(0.09, 0.025, 0.02, 700);
+      tone(190, 0.12, "sawtooth", 0.030);
+      noise(0.10, 0.020, 0.02, 650);
     } else if (name === "allin") {
-      tone(85, 0.22, "sawtooth", 0.08);
-      tone(150, 0.25, "square", 0.05, 0.05);
-      noise(0.24, 0.08, 0.02, 500);
+      impact(2.8, 0);
+      riser(110, 420, 0.36, "sawtooth", 0.045, 0.02);
+      coinCascade(18, 0.18);
     } else if (name === "emote") {
-      tone(780, 0.07, "sine", 0.03);
-      tone(1040, 0.08, "sine", 0.025, 0.06);
+      tone(780, 0.06, "sine", 0.024);
+      tone(1040, 0.08, "sine", 0.020, 0.055);
     } else if (name === "bust") {
-      tone(70, 0.35, "sawtooth", 0.09);
-      noise(0.45, 0.11, 0.02, 450);
-      tone(110, 0.25, "square", 0.05, 0.18);
+      playEffectSound("bust", 0);
     } else if (name === "hand") {
-      const base = 360 + rank * 55;
-      tone(base, 0.10, "triangle", 0.035);
-      tone(base * 1.25, 0.12, "triangle", 0.03, 0.08);
-      if (rank >= 5) tone(base * 1.5, 0.18, "sine", 0.035, 0.18);
-      if (rank >= 7) tone(base * 2, 0.25, "sine", 0.04, 0.28);
+      const base = 300 + rank * 70;
+      tone(base, 0.09, "triangle", 0.026);
+      tone(base * 1.28, 0.12, "triangle", 0.024, 0.08);
+      if (rank >= 5) tone(base * 1.62, 0.20, "sine", 0.028, 0.18);
+      if (rank >= 7) riser(base * 0.9, base * 2.3, 0.45, "sine", 0.025, 0.20);
     } else if (name === "showdown") {
-      const power = Math.max(1, rank);
-      tone(180, 0.12, "sawtooth", 0.04);
-      tone(260, 0.12, "sawtooth", 0.04, 0.10);
-      tone(390, 0.16, "triangle", 0.045, 0.22);
-      tone(520 + power * 35, 0.26, "sine", 0.055, 0.38);
-      if (power >= 6) {
-        tone(780, 0.32, "sine", 0.05, 0.55);
-        noise(0.5, 0.06, 0.2, 2200);
-      }
-      if (power >= 8) {
-        tone(1040, 0.5, "sine", 0.06, 0.75);
-        tone(1560, 0.6, "sine", 0.045, 0.95);
-      }
+      playEffectSound(effect || "highcard", rank, finalWinner);
     }
   } catch (e) {
     console.warn("Sound failed:", e);
   }
 }
-
 
 const praises = [
   "牌桌唯一亲爹，直接把所有人打成背景板。",
@@ -586,8 +717,8 @@ function showShowdownEffect(winners, busted, finalWinner = null) {
     : "";
   const finalLine = finalWinner ? `<div class="finalLine">${escapeHtml(finalWinner.name)} 统治牌桌 · 最终筹码 ${finalWinner.chips}</div>` : "";
 
-  playSound("showdown", strongest.rank);
-  if (busted.length) setTimeout(() => playSound("bust"), 420);
+  playSound("showdown", strongest.rank, effect, !!finalWinner);
+  if (busted.length) setTimeout(() => playSound("bust"), 620);
   const overlay = document.createElement("div");
   overlay.id = "showOverlay";
   overlay.className = `showOverlay showdown effect-${effect} ${busted.length ? "has-bust" : ""} ${finalWinner ? "final-winner-mode" : ""}`;
@@ -608,7 +739,8 @@ function showShowdownEffect(winners, busted, finalWinner = null) {
   setTimeout(() => {
     overlay.style.animation = "overlayOut .85s ease both";
     setTimeout(() => removeOverlay("showOverlay"), 850);
-  }, effect === "royal" ? 7600 : busted.length ? 6500 : 5600);
+    setMusicMood("lobby");
+  }, effectDuration);
 }
 
 function personalEffectHTML(effect) {
@@ -1061,6 +1193,11 @@ function startThreeCinematic(effect, options = {}) {
 
   if (!window.THREE) {
     console.warn("Three.js not loaded. Falling back to Canvas/CSS effects only.");
+    const warn = document.createElement("div");
+    warn.className = "threeMissingWarn";
+    warn.textContent = "3D engine not loaded — using Canvas/CSS fallback";
+    document.body.appendChild(warn);
+    setTimeout(() => warn.remove(), 3500);
     return;
   }
 
@@ -1291,7 +1428,7 @@ function startThreeCinematic(effect, options = {}) {
     chips.push(chip);
   }
 
-  const chipCount = Math.min(260, Math.floor(45 + power * 46));
+  const chipCount = Math.min(520, Math.floor(95 + power * 90));
   for (let i = 0; i < chipCount; i++) spawnChip(i, chipCount);
 
   function spawnShard(i, count) {
@@ -1312,7 +1449,7 @@ function startThreeCinematic(effect, options = {}) {
     shards.push(shard);
   }
 
-  const shardCount = Math.min(900, Math.floor(160 + power * 150));
+  const shardCount = Math.min(1800, Math.floor(320 + power * 260));
   for (let i = 0; i < shardCount; i++) spawnShard(i, shardCount);
 
   function spawnRing(i) {
@@ -1390,16 +1527,16 @@ function startThreeCinematic(effect, options = {}) {
     const elapsed = clock.elapsedTime;
     const intro = Math.min(elapsed / 1.45, 1);
     const climax = Math.min(Math.max((elapsed - 1.2) / 1.1, 0), 1);
-    const slowmo = elapsed > 2.05 && elapsed < 3.05;
-    const speedMul = slowmo ? 0.18 : 1;
+    const slowmo = elapsed > 1.75 && elapsed < 3.35;
+    const speedMul = slowmo ? 0.10 : 1;
 
     // Cinematic camera zoom/rotation
     const zoomIn = easeOutCubic(intro);
     const orbit = elapsed * (0.18 + power * 0.015);
-    const radius = 42 - zoomIn * 15 + Math.sin(elapsed*1.6) * 1.4;
-    camera.position.x = Math.sin(orbit) * (6 + power);
+    const radius = 52 - zoomIn * 27 + Math.sin(elapsed*1.6) * 2.5;
+    camera.position.x = Math.sin(orbit) * (12 + power * 2.4);
     camera.position.z = radius;
-    camera.position.y = 19 - zoomIn * 8 + Math.sin(elapsed * 1.1) * 1.2;
+    camera.position.y = 24 - zoomIn * 14 + Math.sin(elapsed * 1.1) * 1.8;
     if (elapsed > 3.15) {
       camera.position.z += Math.sin((elapsed-3.15) * 2.4) * 2.4;
       camera.position.y += Math.sin((elapsed-3.15) * 1.8) * 1.0;
@@ -1410,7 +1547,7 @@ function startThreeCinematic(effect, options = {}) {
     camera.position.x += shake;
     camera.position.y += Math.cos(elapsed*39) * 0.04 * power;
 
-    tableGroup.rotation.y += dt * 0.12 * power * speedMul;
+    tableGroup.rotation.y += dt * 0.28 * power * speedMul;
     innerGlow.material.opacity = 0.35 + Math.sin(elapsed*5) * 0.25;
     flashLight.intensity = Math.max(0, Math.sin(elapsed * 7) * 4 * power + climax * 10);
 
@@ -1500,7 +1637,7 @@ function startThreeCinematic(effect, options = {}) {
 
   animate();
 
-  const duration = options.duration || (options.finalWinner ? 9800 : 8200);
+  const duration = options.duration || (options.finalWinner ? 12500 : 9300);
   setTimeout(() => stopThreeCinematic(), duration);
 }
 
