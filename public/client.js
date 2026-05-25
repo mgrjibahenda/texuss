@@ -8,6 +8,7 @@ let soundEnabled = false;
 let audioCtx = null;
 let lastSoundPhaseKey = "";
 let lastActionSound = "";
+let musicNodes = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -52,6 +53,56 @@ function noise(duration = 0.18, gain = 0.08, delay = 0, filterFreq = 900) {
   vol.connect(ctx.destination);
   src.start(ctx.currentTime + delay);
   src.stop(ctx.currentTime + delay + duration);
+}
+
+
+function startBackgroundMusic() {
+  if (!soundEnabled || musicNodes) return;
+  const ctx = getAudio();
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0.035, ctx.currentTime);
+  master.connect(ctx.destination);
+
+  const bass = ctx.createOscillator();
+  const bassGain = ctx.createGain();
+  bass.type = "sine";
+  bass.frequency.setValueAtTime(55, ctx.currentTime);
+  bassGain.gain.setValueAtTime(0.12, ctx.currentTime);
+  bass.connect(bassGain);
+  bassGain.connect(master);
+
+  const pad1 = ctx.createOscillator();
+  const pad2 = ctx.createOscillator();
+  const padGain = ctx.createGain();
+  pad1.type = "triangle";
+  pad2.type = "sine";
+  pad1.frequency.setValueAtTime(220, ctx.currentTime);
+  pad2.frequency.setValueAtTime(277.18, ctx.currentTime);
+  padGain.gain.setValueAtTime(0.05, ctx.currentTime);
+  pad1.connect(padGain);
+  pad2.connect(padGain);
+  padGain.connect(master);
+
+  const lfo = ctx.createOscillator();
+  const lfoGain = ctx.createGain();
+  lfo.frequency.setValueAtTime(0.08, ctx.currentTime);
+  lfoGain.gain.setValueAtTime(0.018, ctx.currentTime);
+  lfo.connect(lfoGain);
+  lfoGain.connect(master.gain);
+
+  bass.start();
+  pad1.start();
+  pad2.start();
+  lfo.start();
+
+  // Soft casino pulse loop.
+  const pulse = setInterval(() => {
+    if (!soundEnabled || !audioCtx) return;
+    tone(440, 0.035, "triangle", 0.012);
+    tone(660, 0.04, "sine", 0.009, 0.12);
+  }, 3600);
+
+  musicNodes = { master, bass, pad1, pad2, lfo, pulse };
 }
 
 function playSound(name, rank = 0) {
@@ -200,8 +251,21 @@ $("soundToggle").onclick = () => {
   if (soundEnabled) {
     getAudio();
     playSound("chip");
+    startBackgroundMusic();
   }
 };
+
+
+$("menuSoundBtn").onclick = () => {
+  soundEnabled = true;
+  getAudio();
+  startBackgroundMusic();
+  $("menuSoundBtn").textContent = "🔊 Sound + Music On";
+  const toggle = $("soundToggle");
+  if (toggle) toggle.textContent = "🔊 Sound";
+  playSound("showdown", 4);
+};
+
 
 function handleJoinResponse(res) {
   if (!res.ok) {
@@ -512,6 +576,7 @@ function showShowdownEffect(winners, busted, finalWinner = null) {
 
   const strongest = winners.reduce((a, b) => (b.rank > a.rank ? b : a), winners[0]);
   const effect = strongest.effect || "highcard";
+  startCanvasCinematic(effect, { bust: busted.length > 0, duration: finalWinner ? 9000 : 7600 });
   const title = finalWinner ? "FINAL WINNER" : (winners.length > 1 ? "SPLIT POT" : "SHOWDOWN");
   const winLines = winners
     .map(w => `<div class="cleanWinnerName">${escapeHtml(w.name)}</div><div class="cleanWinnerHand">${escapeHtml(w.handNameCn)} +${w.amount}</div>`)
@@ -560,30 +625,31 @@ function personalEffectHTML(effect) {
 }
 
 
+
 function bigEffectHTML(effect) {
-  let html = "";
+  let html = `<div class="cinemaShake"></div><div class="particleField"></div>`;
   if (effect === "royal") {
-    html += `<div class="royalCrown">♛</div><div class="goldStorm"></div><div class="sunBlast"></div><div class="orbit mega"></div>`;
-    for (let i = 0; i < 18; i++) html += `<div class="meteor royalMeteor" style="animation-delay:${i * .055}s"></div>`;
-    for (let i = 0; i < 12; i++) html += `<div class="burst goldBurst" style="left:${8 + i * 8}%;top:${18 + (i % 4) * 16}%;animation-delay:${i * .09}s"></div>`;
+    html += `<div class="royalCrown">♛</div><div class="goldStorm ultra"></div><div class="sunBlast ultra"></div><div class="orbit mega"></div><div class="royalThrone"></div>`;
+    for (let i = 0; i < 28; i++) html += `<div class="meteor royalMeteor" style="animation-delay:${i * .04}s;top:${8 + (i%9)*8}%"></div>`;
+    for (let i = 0; i < 18; i++) html += `<div class="burst goldBurst" style="left:${5 + i * 5.3}%;top:${14 + (i % 5) * 14}%;animation-delay:${i * .07}s"></div>`;
   } else if (effect === "straightflush") {
-    html += `<div class="neonTunnel big"></div><div class="rainbowRoad"></div><div class="orbit mega"></div>`;
-    for (let i = 0; i < 16; i++) html += `<div class="laser megaLaser" style="--i:${i};animation-delay:${i * .04}s"></div>`;
+    html += `<div class="neonTunnel big"></div><div class="rainbowRoad"></div><div class="spaceWarp"></div><div class="orbit mega"></div>`;
+    for (let i = 0; i < 22; i++) html += `<div class="laser megaLaser" style="--i:${i};animation-delay:${i * .032}s"></div>`;
   } else if (effect === "fourkind") {
-    html += `<div class="quadShock"></div><div class="screenPunch">✦ ✦ ✦ ✦</div>`;
-    for (let i = 0; i < 4; i++) html += `<div class="pillar superPillar" style="left:${14+i*24}%"></div>`;
+    html += `<div class="quadShock"></div><div class="screenPunch">✦ ✦ ✦ ✦</div><div class="gravityCrush"></div>`;
+    for (let i = 0; i < 4; i++) html += `<div class="pillar superPillar" style="left:${10+i*26}%"></div>`;
   } else if (effect === "fullhouse") {
-    html += `<div class="mansionFlash"></div><div class="houseDrop">◆</div><div class="houseDrop two">◆</div><div class="houseDrop three">◆</div><div class="houseRing"></div>`;
+    html += `<div class="mansionFlash"></div><div class="casinoVault"></div><div class="houseDrop">◆</div><div class="houseDrop two">◆</div><div class="houseDrop three">◆</div><div class="houseRing"></div>`;
   } else if (effect === "flush") {
-    html += `<div class="waterWave big"></div><div class="suitRain">♥ ♦ ♣ ♠ ♥ ♦ ♣ ♠</div><div class="blueSplash"></div>`;
+    html += `<div class="waterWave big"></div><div class="suitRain">♥ ♦ ♣ ♠ ♥ ♦ ♣ ♠</div><div class="blueSplash"></div><div class="tidalWall"></div>`;
   } else if (effect === "straight") {
-    html += `<div class="straightGrid"></div><div class="lightningLine big"></div><div class="lightningLine big second"></div><div class="lightningLine big third"></div><div class="boltIcon">⚡</div>`;
+    html += `<div class="straightGrid"></div><div class="lightningLine big"></div><div class="lightningLine big second"></div><div class="lightningLine big third"></div><div class="boltIcon">⚡</div><div class="thunderCloud"></div>`;
   } else if (effect === "threekind") {
-    html += `<div class="triplePulse big"></div><div class="tripleText">3 3 3</div>`;
+    html += `<div class="triplePulse big"></div><div class="tripleText">3 3 3</div><div class="shockRings"></div>`;
   } else if (effect === "twopair") {
-    html += `<div class="ring big"></div><div class="ring big second"></div><div class="pairClash">×2</div>`;
+    html += `<div class="ring big"></div><div class="ring big second"></div><div class="pairClash">×2</div><div class="dualBlades"></div>`;
   } else if (effect === "onepair") {
-    html += `<div class="ring big subtle"></div><div class="pairClash small">PAIR</div>`;
+    html += `<div class="ring big subtle"></div><div class="pairClash small">PAIR</div><div class="silverPulse"></div>`;
   } else {
     html += `<div class="dustPop"></div>`;
   }
@@ -599,25 +665,35 @@ function bustedEffectHTML() {
 }
 
 
+
 function openEffectGallery() {
   removeOverlay("galleryOverlay");
   const overlay = document.createElement("div");
   overlay.id = "galleryOverlay";
   overlay.className = "galleryOverlay";
   overlay.innerHTML = `
-    <div class="galleryPanel">
-      <button class="galleryClose" id="galleryClose">×</button>
-      <h2>Winner Effect Gallery</h2>
-      <p>密码已通过。点击任意牌型，播放与真牌局相同的画面和声音。</p>
+    <div class="galleryTopBar">
+      <div class="galleryTitle">Effect Preview</div>
       <div class="galleryGrid">
         ${galleryHands.map(h => `<button class="galleryHand" data-effect="${h.effect}" data-rank="${h.rank}" data-name="${h.name}">${h.name}</button>`).join("")}
       </div>
+      <button class="galleryClose" id="galleryClose">×</button>
     </div>
+    <div class="galleryHelp">点击上方牌型预览。画面和声音与真牌局一致。</div>
   `;
   document.body.appendChild(overlay);
   $("galleryClose").onclick = () => removeOverlay("galleryOverlay");
   overlay.querySelectorAll("[data-effect]").forEach(btn => {
     btn.onclick = () => {
+      if (!soundEnabled) {
+        soundEnabled = true;
+        getAudio();
+        startBackgroundMusic();
+        const menuBtn = $("menuSoundBtn");
+        const toggle = $("soundToggle");
+        if (menuBtn) menuBtn.textContent = "🔊 Sound + Music On";
+        if (toggle) toggle.textContent = "🔊 Sound";
+      }
       const effect = btn.dataset.effect;
       const rank = Number(btn.dataset.rank);
       const name = btn.dataset.name;
@@ -639,7 +715,339 @@ function openEffectGallery() {
 }
 
 
+let canvasFx = null;
+
+function stopCanvasCinematic() {
+  if (canvasFx?.raf) cancelAnimationFrame(canvasFx.raf);
+  if (canvasFx?.canvas) canvasFx.canvas.remove();
+  canvasFx = null;
+}
+
+function startCanvasCinematic(effect, options = {}) {
+  stopCanvasCinematic();
+
+  const canvas = document.createElement("canvas");
+  canvas.id = "canvasCinematicFx";
+  canvas.className = `canvasCinematicFx canvas-${effect}`;
+  document.body.appendChild(canvas);
+
+  const ctx = canvas.getContext("2d");
+  const particles = [];
+  const bolts = [];
+  const rings = [];
+  const chips = [];
+  const suits = ["♠", "♥", "♦", "♣"];
+  let w = 0;
+  let h = 0;
+  let t = 0;
+  let raf = null;
+
+  const rankPower = {
+    foldwin: 1,
+    highcard: 1,
+    onepair: 2,
+    twopair: 3,
+    threekind: 4,
+    straight: 5,
+    flush: 6,
+    fullhouse: 7,
+    fourkind: 8,
+    straightflush: 9,
+    royal: 11,
+    bust: 9
+  }[effect] || 4;
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth;
+    h = window.innerHeight;
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function colorFor(i) {
+    const palettes = {
+      royal: ["#fff7b0", "#ffd700", "#ff8a00", "#ffffff"],
+      straightflush: ["#9dfffc", "#7dff9d", "#f5d66c", "#ffffff"],
+      fourkind: ["#d9b3ff", "#ffb3e6", "#ffffff"],
+      fullhouse: ["#ffc46b", "#fff0a8", "#ff8d8d"],
+      flush: ["#64d2ff", "#d7ffe8", "#ffffff"],
+      straight: ["#b8ff7d", "#ffffff", "#eaff74"],
+      threekind: ["#ffb3b3", "#fff0a8", "#ffffff"],
+      twopair: ["#cde2ff", "#f5d66c", "#ffffff"],
+      onepair: ["#ffffff", "#e8e8e8", "#f5d66c"],
+      bust: ["#ff3333", "#7b0000", "#ffffff"]
+    };
+    const p = palettes[effect] || palettes.onepair;
+    return p[i % p.length];
+  }
+
+  function addParticle(x, y, count, speed, sizeBase, lifeBase, mode = "burst") {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = speed * (0.35 + Math.random());
+      const spiral = mode === "spiral" ? i * 0.12 : 0;
+      particles.push({
+        x, y,
+        vx: Math.cos(a + spiral) * sp,
+        vy: Math.sin(a + spiral) * sp,
+        life: lifeBase * (0.55 + Math.random() * 0.75),
+        maxLife: lifeBase,
+        size: sizeBase * (0.4 + Math.random() * 1.4),
+        color: colorFor(i),
+        rot: Math.random() * Math.PI,
+        vr: (Math.random() - 0.5) * 0.22,
+        type: Math.random() < 0.18 && rankPower >= 6 ? "suit" : "dot",
+        suit: suits[Math.floor(Math.random() * suits.length)]
+      });
+    }
+  }
+
+  function addRing(x, y, color, speed = 10, width = 8) {
+    rings.push({ x, y, r: 10, alpha: 1, color, speed, width });
+  }
+
+  function addBolt() {
+    const y = h * (0.18 + Math.random() * 0.62);
+    const points = [];
+    const segments = 9 + Math.floor(Math.random() * 6);
+    for (let i = 0; i <= segments; i++) {
+      points.push({
+        x: (w / segments) * i,
+        y: y + (Math.random() - 0.5) * h * 0.18
+      });
+    }
+    bolts.push({ points, life: 18 + Math.random() * 18, color: colorFor(0), width: 5 + Math.random() * 8 });
+  }
+
+  function addChipSpray(count) {
+    for (let i = 0; i < count; i++) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.25;
+      const sp = 7 + Math.random() * 12;
+      chips.push({
+        x: w / 2 + (Math.random() - 0.5) * 80,
+        y: h * 0.62,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp,
+        g: 0.28,
+        r: 8 + Math.random() * 8,
+        life: 120 + Math.random() * 80,
+        color: colorFor(i),
+        spin: Math.random() * Math.PI
+      });
+    }
+  }
+
+  function initialBurst() {
+    const cx = w / 2;
+    const cy = h / 2;
+
+    addParticle(cx, cy, 80 + rankPower * 28, 5 + rankPower * 0.8, 3 + rankPower * 0.35, 70 + rankPower * 8, rankPower >= 7 ? "spiral" : "burst");
+    addRing(cx, cy, colorFor(0), 8 + rankPower, 6 + rankPower * 0.8);
+    addRing(cx, cy, colorFor(1), 12 + rankPower, 4 + rankPower * 0.5);
+
+    if (["royal", "straightflush", "fourkind", "straight"].includes(effect)) {
+      for (let i = 0; i < 4 + rankPower; i++) addBolt();
+    }
+
+    if (["royal", "straightflush", "fullhouse", "fourkind"].includes(effect)) {
+      addChipSpray(40 + rankPower * 8);
+    }
+
+    if (effect === "flush") {
+      for (let i = 0; i < 9; i++) {
+        addRing(cx, h * (0.2 + i * 0.075), "#64d2ff", 7 + i, 5);
+      }
+    }
+
+    if (effect === "bust" || options.bust) {
+      for (let i = 0; i < 10; i++) addRing(cx, cy, "#ff3333", 12 + i * 2, 8);
+      addParticle(cx, cy, 260, 13, 5, 92, "burst");
+      for (let i = 0; i < 9; i++) addBolt();
+    }
+  }
+
+  function drawBackground() {
+    if (effect === "royal") {
+      const grad = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, Math.max(w,h)*0.7);
+      grad.addColorStop(0, "rgba(255,215,0,0.20)");
+      grad.addColorStop(0.45, "rgba(255,138,0,0.10)");
+      grad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0,0,w,h);
+    }
+    if (effect === "straightflush") {
+      ctx.save();
+      ctx.translate(w/2, h/2);
+      ctx.rotate(t * 0.018);
+      for (let i = 0; i < 26; i++) {
+        ctx.strokeStyle = `hsla(${(i*18+t*4)%360},100%,70%,0.25)`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0,0,40+i*24,0,Math.PI*2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (effect === "straight") {
+      ctx.strokeStyle = "rgba(184,255,125,0.16)";
+      ctx.lineWidth = 1;
+      for (let x = (t*8)%80; x < w; x += 80) {
+        ctx.beginPath();
+        ctx.moveTo(x,0);
+        ctx.lineTo(x,h);
+        ctx.stroke();
+      }
+      for (let y = (t*8)%80; y < h; y += 80) {
+        ctx.beginPath();
+        ctx.moveTo(0,y);
+        ctx.lineTo(w,y);
+        ctx.stroke();
+      }
+    }
+  }
+
+  function drawParticles() {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life--;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.985;
+      p.vy *= 0.985;
+      p.vy += effect === "bust" ? 0.12 : 0.025;
+      p.rot += p.vr;
+      const a = Math.max(p.life / p.maxLife, 0);
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 16;
+      if (p.type === "suit") {
+        ctx.font = `${p.size * 4}px serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(p.suit, 0, 0);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+  }
+
+  function drawRings() {
+    for (let i = rings.length - 1; i >= 0; i--) {
+      const r = rings[i];
+      r.r += r.speed;
+      r.alpha *= 0.965;
+      ctx.save();
+      ctx.globalAlpha = r.alpha;
+      ctx.strokeStyle = r.color;
+      ctx.lineWidth = r.width;
+      ctx.shadowColor = r.color;
+      ctx.shadowBlur = 28;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      if (r.alpha < 0.03 || r.r > Math.max(w,h)) rings.splice(i, 1);
+    }
+  }
+
+  function drawBolts() {
+    for (let i = bolts.length - 1; i >= 0; i--) {
+      const b = bolts[i];
+      b.life--;
+      ctx.save();
+      ctx.globalAlpha = Math.max(b.life / 30, 0);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = b.width + 4;
+      ctx.shadowColor = b.color;
+      ctx.shadowBlur = 34;
+      ctx.beginPath();
+      b.points.forEach((p, idx) => {
+        const jitter = (Math.random() - 0.5) * 22;
+        if (idx === 0) ctx.moveTo(p.x, p.y + jitter);
+        else ctx.lineTo(p.x, p.y + jitter);
+      });
+      ctx.stroke();
+      ctx.strokeStyle = b.color;
+      ctx.lineWidth = b.width;
+      ctx.stroke();
+      ctx.restore();
+      if (b.life <= 0) bolts.splice(i, 1);
+    }
+  }
+
+  function drawChips() {
+    for (let i = chips.length - 1; i >= 0; i--) {
+      const c = chips[i];
+      c.life--;
+      c.x += c.vx;
+      c.y += c.vy;
+      c.vy += c.g;
+      c.vx *= 0.992;
+      c.spin += 0.22;
+      ctx.save();
+      ctx.globalAlpha = Math.min(c.life / 35, 1);
+      ctx.translate(c.x, c.y);
+      ctx.rotate(c.spin);
+      ctx.fillStyle = c.color;
+      ctx.strokeStyle = "rgba(255,255,255,.9)";
+      ctx.lineWidth = 3;
+      ctx.shadowColor = c.color;
+      ctx.shadowBlur = 18;
+      ctx.beginPath();
+      ctx.ellipse(0,0,c.r,c.r*0.65,0,0,Math.PI*2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      if (c.life <= 0 || c.y > h + 80) chips.splice(i, 1);
+    }
+  }
+
+  function tick() {
+    t++;
+    ctx.clearRect(0, 0, w, h);
+    drawBackground();
+
+    if (t % Math.max(8, 26 - rankPower * 2) === 0) {
+      addParticle(Math.random()*w, Math.random()*h, 10 + rankPower * 2, 2 + rankPower * .25, 2.5, 55, "burst");
+    }
+    if (["straight", "straightflush", "royal", "bust"].includes(effect) && t % 16 === 0) addBolt();
+    if (["royal", "straightflush"].includes(effect) && t % 24 === 0) addRing(w/2, h/2, colorFor(t), 8 + Math.random()*8, 4 + Math.random()*4);
+    if (effect === "flush" && t % 20 === 0) addRing(w/2, h * .85, "#64d2ff", 8, 5);
+
+    drawRings();
+    drawBolts();
+    drawChips();
+    drawParticles();
+
+    raf = requestAnimationFrame(tick);
+    canvasFx.raf = raf;
+  }
+
+  resize();
+  window.addEventListener("resize", resize, { passive: true });
+  initialBurst();
+  canvasFx = { canvas, raf, resize };
+  tick();
+
+  setTimeout(() => stopCanvasCinematic(), options.duration || 7600);
+}
+
 function removeOverlay(id) {
+  if (id === "showOverlay") stopCanvasCinematic();
   const old = document.getElementById(id);
   if (old) old.remove();
 }

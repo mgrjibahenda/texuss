@@ -1384,3 +1384,338 @@ input::placeholder { color: rgba(255,255,255,.55); }
     font-size: clamp(18px, 4vw, 30px);
   }
 }
+
+
+
+
+/* v9 cinematic upgrade */
+.soundMenu {
+  margin: 8px 0;
+  background: linear-gradient(135deg, rgba(255,255,255,.18), rgba(245,214,108,.16));
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.20);
+}
+.loginCard {
+  background:
+    radial-gradient(circle at top, rgba(245,214,108,.14), transparent 32%),
+    rgba(0,0,0,.40) !important;
+}
+
+/* Gallery moved to top, no blur, no dimming that hides effect */
+.galleryOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  pointer-events: none;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  display: block !important;
+}
+.galleryTopBar {
+  pointer-events: auto;
+  position: fixed;
+  left: 50%;
+  top: 10px;
+  transform: translateX(-50%);
+  width: min(1180px, 96vw);
+  padding: 10px;
+  border-radius: 22px;
+  background: rgba(0,0,0,.62);
+  border: 1px solid rgba(255,255,255,.18);
+  backdrop-filter: blur(10px);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 18px 50px rgba(0,0,0,.42);
+}
+.galleryTitle {
+  font-weight: 1000;
+  color: #fff0a8;
+  white-space: nowrap;
+}
+.galleryGrid {
+  display: flex !important;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px;
+}
+.galleryHand {
+  min-height: 40px !important;
+  padding: 9px 12px !important;
+  white-space: nowrap;
+  font-size: 14px !important;
+  border-radius: 999px !important;
+  background: linear-gradient(135deg, #f5d66c, #fff4b7) !important;
+}
+.galleryClose {
+  position: static !important;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
+}
+.galleryHelp {
+  pointer-events: none;
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.48);
+  color: rgba(255,255,255,.82);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* cinematic atmosphere */
+body {
+  background:
+    radial-gradient(circle at 16% 2%, rgba(245,214,108,.30), transparent 28%),
+    radial-gradient(circle at 86% 5%, rgba(87,157,255,.18), transparent 28%),
+    radial-gradient(circle at 50% 120%, rgba(0,180,110,.20), transparent 38%),
+    linear-gradient(145deg, #030907, #071b13 45%, #010403) !important;
+}
+.pokerTable {
+  transform-style: preserve-3d;
+  animation: tableBreath 4s ease-in-out infinite alternate;
+}
+.card {
+  transform-style: preserve-3d;
+}
+.showOverlay.showdown {
+  perspective: 900px;
+}
+.showOverlay.showdown::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,.24), transparent 28%),
+    linear-gradient(120deg, transparent 0 42%, rgba(255,255,255,.15) 48%, transparent 56% 100%);
+  mix-blend-mode: screen;
+  z-index: 1;
+  animation: cameraSweep 1.6s ease-in-out infinite;
+}
+.cinemaShake {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  animation: screenShake .25s linear infinite;
+}
+.particleField {
+  position: fixed;
+  inset: -10%;
+  z-index: 2;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, rgba(255,255,255,.85) 0 1px, transparent 2px),
+    radial-gradient(circle, rgba(245,214,108,.8) 0 2px, transparent 3px),
+    radial-gradient(circle, rgba(100,210,255,.8) 0 1px, transparent 2px);
+  background-size: 46px 46px, 92px 92px, 130px 130px;
+  animation: particleDrift 2.4s linear infinite;
+  opacity: .75;
+}
+.showModal {
+  z-index: 30 !important;
+  animation: slam3d .75s cubic-bezier(.15,1.6,.22,1) both !important;
+}
+
+/* extra cinematic effect layers */
+.royalThrone {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  background:
+    linear-gradient(90deg, transparent 0 20%, rgba(255,215,0,.18) 45% 55%, transparent 80% 100%),
+    repeating-conic-gradient(from 0deg, rgba(255,215,0,.12) 0 8deg, transparent 9deg 18deg);
+  animation: throneSpin 3.2s linear infinite;
+}
+.goldStorm.ultra {
+  opacity: 1 !important;
+  filter: saturate(1.8) brightness(1.25) drop-shadow(0 0 8px #ffd700);
+}
+.sunBlast.ultra {
+  animation-duration: .78s !important;
+}
+.spaceWarp {
+  position: fixed;
+  width: 140vw;
+  height: 140vh;
+  left: -20vw;
+  top: -20vh;
+  z-index: 3;
+  background: repeating-radial-gradient(ellipse at center, transparent 0 22px, rgba(157,255,252,.22) 24px 28px);
+  animation: warpZoom .8s linear infinite;
+}
+.gravityCrush {
+  position: fixed;
+  inset: 0;
+  z-index: 7;
+  background: radial-gradient(circle, transparent 0 28%, rgba(217,179,255,.35) 31%, transparent 36%);
+  animation: gravityCrush 1s ease-in-out infinite;
+}
+.casinoVault {
+  position: fixed;
+  width: min(520px,80vw);
+  height: min(320px,52vw);
+  border-radius: 28px;
+  border: 18px solid rgba(255,196,107,.75);
+  left: 50%;
+  top: 48%;
+  translate: -50% -50%;
+  z-index: 4;
+  box-shadow: 0 0 50px rgba(255,196,107,.75), inset 0 0 40px rgba(255,196,107,.35);
+  animation: vaultOpen 1.2s ease-in-out infinite alternate;
+}
+.tidalWall {
+  position: fixed;
+  left: -10%;
+  right: -10%;
+  bottom: -30%;
+  height: 65vh;
+  z-index: 6;
+  background: radial-gradient(ellipse at top, rgba(100,210,255,.65), rgba(100,210,255,.20), transparent 70%);
+  animation: tideRise 1.4s ease-in-out infinite alternate;
+}
+.thunderCloud {
+  position: fixed;
+  left: 50%;
+  top: 8%;
+  translate: -50% 0;
+  width: min(700px,92vw);
+  height: 140px;
+  z-index: 7;
+  background:
+    radial-gradient(circle at 20% 60%, rgba(30,30,30,.85), transparent 32%),
+    radial-gradient(circle at 45% 40%, rgba(60,60,60,.85), transparent 38%),
+    radial-gradient(circle at 70% 65%, rgba(35,35,35,.85), transparent 34%);
+  filter: drop-shadow(0 0 26px rgba(184,255,125,.6));
+  animation: cloudPulse .45s ease-in-out infinite alternate;
+}
+.shockRings {
+  position: fixed;
+  width: min(640px,88vw);
+  height: min(640px,88vw);
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  z-index: 5;
+  border-radius: 50%;
+  background: repeating-radial-gradient(circle, rgba(255,179,179,.35) 0 6px, transparent 8px 34px);
+  animation: ringSpin 1.2s linear infinite;
+}
+.dualBlades {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  background:
+    linear-gradient(45deg, transparent 45%, rgba(120,190,255,.85) 49%, transparent 53%),
+    linear-gradient(-45deg, transparent 45%, rgba(245,214,108,.85) 49%, transparent 53%);
+  animation: bladeClash .7s ease-in-out infinite alternate;
+}
+.silverPulse {
+  position: fixed;
+  width: min(460px,80vw);
+  height: min(460px,80vw);
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  border-radius: 50%;
+  z-index: 4;
+  background: radial-gradient(circle, rgba(255,255,255,.38), transparent 65%);
+  animation: silverPulse 1.1s ease-in-out infinite alternate;
+}
+
+/* Make specific effects much more obvious */
+.lightningLine.big {
+  height: 38px !important;
+  filter: drop-shadow(0 0 20px #b8ff7d) drop-shadow(0 0 54px #fff) !important;
+}
+.boltIcon {
+  z-index: 24 !important;
+  font-size: clamp(130px, 24vw, 290px) !important;
+}
+.neonTunnel.big {
+  width: min(860px, 110vw) !important;
+  height: min(860px, 110vw) !important;
+}
+.quadShock {
+  z-index: 4 !important;
+}
+.superPillar {
+  z-index: 12 !important;
+}
+
+/* menu sound button visual */
+#menuSoundBtn {
+  animation: soundGlow 1.5s ease-in-out infinite alternate;
+}
+
+/* Fixed center on mobile for ring/pulse effects */
+.ring, .triplePulse, .neonTunnel, .orbit, .houseRing, .dustPop, .shockRings, .silverPulse {
+  left: 50% !important;
+  top: 50% !important;
+  translate: -50% -50% !important;
+}
+
+/* Keyframes */
+@keyframes tableBreath { from { filter: brightness(.98) saturate(1); } to { filter: brightness(1.08) saturate(1.08); } }
+@keyframes cameraSweep { from { opacity: .25; transform: translateX(-6%) rotate(-1deg); } to { opacity: .75; transform: translateX(6%) rotate(1deg); } }
+@keyframes screenShake { 0%,100% { transform: translate(0,0); } 25% { transform: translate(1px,-1px); } 50% { transform: translate(-1px,1px); } 75% { transform: translate(1px,1px); } }
+@keyframes particleDrift { to { background-position: 140px 240px, -220px 300px, 180px -260px; } }
+@keyframes slam3d { from { opacity: 0; transform: rotateX(50deg) scale(.24); } 70% { opacity: 1; transform: rotateX(-8deg) scale(1.08); } to { transform: rotateX(0) scale(1); } }
+@keyframes throneSpin { to { transform: rotate(360deg); } }
+@keyframes warpZoom { from { transform: scale(.72); opacity: 1; } to { transform: scale(1.18); opacity: .3; } }
+@keyframes gravityCrush { from { transform: scale(.65); opacity: 1; } to { transform: scale(1.35); opacity: .25; } }
+@keyframes vaultOpen { from { transform: scale(.85) rotate(-2deg); opacity: .45; } to { transform: scale(1.05) rotate(2deg); opacity: .95; } }
+@keyframes tideRise { from { transform: translateY(20%); opacity: .35; } to { transform: translateY(-18%); opacity: .95; } }
+@keyframes cloudPulse { from { opacity: .65; transform: scale(.98); } to { opacity: 1; transform: scale(1.04); } }
+@keyframes ringSpin { to { transform: rotate(360deg); } }
+@keyframes bladeClash { from { opacity: .35; transform: scale(.9); } to { opacity: 1; transform: scale(1.06); } }
+@keyframes silverPulse { from { transform: scale(.75); opacity: .35; } to { transform: scale(1.2); opacity: .85; } }
+@keyframes soundGlow { from { box-shadow: 0 0 0 rgba(245,214,108,0); } to { box-shadow: 0 0 22px rgba(245,214,108,.42); } }
+
+@media (max-width: 760px) {
+  .galleryTopBar {
+    top: 6px;
+    grid-template-columns: 1fr auto;
+  }
+  .galleryTitle {
+    display: none;
+  }
+  .galleryGrid {
+    grid-column: 1;
+  }
+  .galleryClose {
+    grid-column: 2;
+  }
+  .galleryHelp {
+    display: none;
+  }
+}
+
+
+
+
+/* v10 Canvas cinematic particle layer */
+.canvasCinematicFx {
+  position: fixed;
+  inset: 0;
+  z-index: 15000;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+.showOverlay {
+  z-index: 16000 !important;
+}
+.galleryOverlay {
+  z-index: 22000 !important;
+}
+.canvas-royal {
+  filter: saturate(1.4) brightness(1.15);
+}
+.canvas-bust {
+  mix-blend-mode: normal;
+}
