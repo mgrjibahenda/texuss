@@ -1,7 +1,7 @@
 {
-  "name": "texas-holdem-v26-hide-hand-blinds",
-  "version": "26.0.0",
-  "description": "Hide hand at showdown toggle and configurable small/big blinds.",
+  "name": "texas-holdem-v27-action-visibility-chipfx",
+  "version": "27.0.0",
+  "description": "Action feedback, mandatory winner reveal, spectator card share, and chip animations.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -11,7 +11,8 @@
     "test:v25-1": "node tests/v25-1-no-repeat-bust-test.js",
     "test:v25-2": "node tests/v25-2-boardpair-displayfix-test.js",
     "test:v25-3": "node tests/v25-3-fullhouse-displayfix-test.js",
-    "test:v26": "node tests/v26-hide-hand-blinds-test.js"
+    "test:v26": "node tests/v26-hide-hand-blinds-test.js",
+    "test:v27": "node tests/v27-action-visibility-chipfx-test.js"
   },
   "dependencies": {
     "express": "^4.18.3",

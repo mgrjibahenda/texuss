@@ -1,6 +1,8 @@
 const socket = io();
 
 let state = null;
+let lastActionId = null;
+let previousChips = new Map();
 let lastShowdownKey = "";
 let lastPersonalScoreKey = "";
 let seenEmoteIds = new Set();
@@ -209,6 +211,7 @@ function render() {
   renderPersonalHandHint();
   renderActions();
   renderHideCardsControl();
+  renderActionFeedback();
   renderHistoryLog();
   renderEmotes();
   spawnIncomingEmotes();
@@ -391,6 +394,8 @@ function renderPlayers() {
       p.isBot ? `<span class="badge botBadge">BOT</span>` : "",
       p.isYou ? `<span class="badge">You</span>` : "",
       p.isYou && p.hideAtShowdown && !["lobby", "showdown"].includes(state.phase) ? `<span class="badge hideBadge">Hide End</span>` : "",
+      p.isYou && p.shareCardsWithSpectators && !["lobby", "showdown"].includes(state.phase) ? `<span class="badge shareBadge">Spectators</span>` : "",
+      p.forceRevealWinner && state.phase === "showdown" ? `<span class="badge revealBadge">Must Show</span>` : "",
       p.chips <= 0 ? `<span class="badge bustedBadge">Spectating</span>` : "",
       p.isYou && p.currentScore && p.currentScore.rank >= 1 && !p.folded && state.phase !== "showdown" ? `<span class="badge handmadeBadge">${escapeHtml(p.currentScore.cn)}</span>` : ""
     ].filter(Boolean).join("");
@@ -454,12 +459,106 @@ function renderHideCardsControl() {
     <button id="hideCardsBtn" class="${me.hideAtShowdown ? "hideActive" : ""}">
       ${me.hideAtShowdown ? "🙈 End: Hide Cards ON" : "👁️ End: Show My Cards"}
     </button>
+    <button id="spectatorShareBtn" class="${me.shareCardsWithSpectators ? "shareActive" : ""}">
+      ${me.shareCardsWithSpectators ? "👀 Spectators: Can See" : "🚫 Spectators: Hidden"}
+    </button>
   `;
 
-  const btn = $("hideCardsBtn");
-  if (btn) btn.onclick = () => socket.emit("toggleHideAtShowdown");
+  const hideBtn = $("hideCardsBtn");
+  if (hideBtn) hideBtn.onclick = () => socket.emit("toggleHideAtShowdown");
+
+  const shareBtn = $("spectatorShareBtn");
+  if (shareBtn) shareBtn.onclick = () => socket.emit("toggleSpectatorShare");
 }
 
+
+
+
+
+function renderActionFeedback() {
+  if (!state) return;
+
+  if (state.lastAction && state.lastAction.id !== lastActionId) {
+    lastActionId = state.lastAction.id;
+    showActionToast(state.lastAction);
+    flashActionSeat(state.lastAction.actorId, state.lastAction.action);
+    if (["call", "raise", "allin"].includes(state.lastAction.action)) {
+      animateChipsToPot(state.lastAction.actorId, state.lastAction.amount);
+    }
+    if (state.lastAction.action === "allin") {
+      document.body.classList.add("tableShake");
+      setTimeout(() => document.body.classList.remove("tableShake"), 520);
+    }
+  }
+
+  state.players.forEach(p => {
+    const prev = previousChips.get(p.id);
+    if (prev !== undefined && prev !== p.chips) {
+      showChipDelta(p.id, p.chips - prev);
+    }
+    previousChips.set(p.id, p.chips);
+  });
+}
+
+function showActionToast(action) {
+  let toast = $("actionToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "actionToast";
+    toast.className = "actionToast";
+    document.body.appendChild(toast);
+  }
+
+  toast.className = `actionToast action-${escapeHtml(action.action || "move")}`;
+  toast.textContent = action.text || "ACTION";
+  toast.classList.remove("show");
+  void toast.offsetWidth;
+  toast.classList.add("show");
+  setTimeout(() => toast.classList.remove("show"), 1250);
+}
+
+function flashActionSeat(playerId, action) {
+  if (!playerId) return;
+  const seat = document.querySelector(`[data-seat-player="${CSS.escape(playerId)}"]`);
+  if (!seat) return;
+
+  seat.classList.remove("seatPulse", "seatFoldPulse", "seatAllinPulse");
+  void seat.offsetWidth;
+  if (action === "fold") seat.classList.add("seatFoldPulse");
+  else if (action === "allin") seat.classList.add("seatAllinPulse");
+  else seat.classList.add("seatPulse");
+
+  setTimeout(() => seat.classList.remove("seatPulse", "seatFoldPulse", "seatAllinPulse"), 900);
+}
+
+function animateChipsToPot(playerId, amount = 0) {
+  const seat = document.querySelector(`[data-seat-player="${CSS.escape(playerId)}"]`);
+  const pot = $("potAmount") || document.querySelector(".pot");
+  if (!seat || !pot) return;
+
+  const from = seat.getBoundingClientRect();
+  const to = pot.getBoundingClientRect();
+  const chip = document.createElement("div");
+  chip.className = "flyingChip";
+  chip.textContent = amount ? `+${amount}` : "●";
+  chip.style.left = `${from.left + from.width / 2}px`;
+  chip.style.top = `${from.top + from.height / 2}px`;
+  chip.style.setProperty("--tx", `${to.left + to.width / 2 - (from.left + from.width / 2)}px`);
+  chip.style.setProperty("--ty", `${to.top + to.height / 2 - (from.top + from.height / 2)}px`);
+  document.body.appendChild(chip);
+  setTimeout(() => chip.remove(), 850);
+}
+
+function showChipDelta(playerId, delta) {
+  if (!delta) return;
+  const seat = document.querySelector(`[data-seat-player="${CSS.escape(playerId)}"]`);
+  if (!seat) return;
+  const badge = document.createElement("div");
+  badge.className = `chipDelta ${delta > 0 ? "chipUp" : "chipDown"}`;
+  badge.textContent = `${delta > 0 ? "+" : ""}${delta}`;
+  seat.appendChild(badge);
+  setTimeout(() => badge.remove(), 1300);
+}
 
 function renderHistoryLog() {
   const log = $("historyLog");

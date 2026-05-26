@@ -150,7 +150,8 @@ function createRoom(hostId, hostName) {
       lastScore: null,
       isBot: false,
       activeThisHand: false,
-      hideAtShowdown: false
+      hideAtShowdown: false,
+      shareCardsWithSpectators: false
     }],
     started: false,
     deck: [],
@@ -179,6 +180,23 @@ function createRoom(hostId, hostName) {
   return room;
 }
 
+
+
+function setLastAction(room, player, action, amount = 0, extra = "") {
+  const name = player?.name || "Player";
+  const upper = String(action || "").toUpperCase();
+  const amountText = amount ? ` ${amount}` : "";
+  const text = extra || `${name} ${upper}${amountText}`;
+  room.lastAction = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    actorId: player?.id || null,
+    actorName: name,
+    action: String(action || "").toLowerCase(),
+    amount: Number(amount) || 0,
+    text,
+    at: Date.now()
+  };
+}
 
 function logHistory(room, text, type = "action") {
   if (!room.history) room.history = [];
@@ -264,6 +282,8 @@ function performBotAction(room) {
 
 
 function publicRoom(room, viewerId) {
+  const viewer = room.players.find(p => p.id === viewerId);
+  const viewerIsSpectator = !!viewer && (!viewer.activeThisHand || viewer.chips <= 0 || viewer.folded);
   return {
     code: room.code,
     hostId: room.hostId,
@@ -285,6 +305,7 @@ function publicRoom(room, viewerId) {
     lastAction: room.lastAction,
     emotes: room.emotes || [],
     history: room.history || [],
+    lastAction: room.lastAction || null,
     players: room.players.map((p, idx) => ({
       id: p.id,
       name: p.name,
@@ -292,12 +313,17 @@ function publicRoom(room, viewerId) {
       chips: p.chips,
       bet: p.bet,
       totalCommitted: p.totalCommitted,
-      hand: p.id === viewerId || (room.phase === "showdown" && !p.hideAtShowdown)
+      // legacy compatibility: room.phase === "showdown" && !p.hideAtShowdown
+      hand: p.id === viewerId
+        || (room.phase === "showdown" && ((room.revealWinnerIds || []).includes(p.id) || !p.hideAtShowdown))
+        || (viewerIsSpectator && p.shareCardsWithSpectators)
         ? p.hand.map(displayCard)
         : p.hand.map(() => ({ code: "BACK", display: "🂠" })),
       folded: p.folded,
       allIn: p.allIn,
       hideAtShowdown: !!p.hideAtShowdown,
+      shareCardsWithSpectators: !!p.shareCardsWithSpectators,
+      forceRevealWinner: !!((room.revealWinnerIds || []).includes(p.id)),
       connected: p.connected,
       activeThisHand: !!p.activeThisHand,
       seat: idx,
@@ -373,6 +399,8 @@ function startHand(room) {
   room.winners = [];
   room.busted = [];
   room.finalWinner = null;
+  room.revealWinnerIds = [];
+  room.lastAction = null;
   room.lastAction = "";
   if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; }
   room.history = room.history || [];
@@ -383,6 +411,7 @@ function startHand(room) {
     p.totalCommitted = 0;
     p.activeThisHand = p.chips > 0;
     p.hideAtShowdown = false;
+    p.shareCardsWithSpectators = false;
     p.folded = p.chips <= 0;
     p.allIn = false;
     p.lastScore = null;
@@ -539,6 +568,8 @@ function finishHand(room) {
   const share = Math.floor(room.pot / winners.length);
   for (const w of winners) w.chips += share;
 
+  room.revealWinnerIds = winners.map(w => w.id);
+
   room.winners = winners.map(w => {
     const shownScore = displayPersonalScore(w.hand, room.community) || w.lastScore;
     return {
@@ -568,6 +599,8 @@ function finishHand(room) {
     room.message = `${survivors[0].name} is the final winner.`;
   } else {
     room.finalWinner = null;
+  room.revealWinnerIds = [];
+  room.lastAction = null;
   }
 
   logHistory(room, room.message, room.finalWinner ? "final" : "showdown");
@@ -700,6 +733,8 @@ function resetHandToLobbyAfterDisconnect(room, disconnectedName) {
   room.winners = [];
   room.busted = [];
   room.finalWinner = null;
+  room.revealWinnerIds = [];
+  room.lastAction = null;
   room.message = `${disconnectedName} disconnected and was kicked. Hand cancelled. Start a new hand.`;
   room.lastAction = "Player disconnected. Hand cancelled.";
 }
@@ -734,7 +769,8 @@ io.on("connection", (socket) => {
       lastScore: null,
       isBot: false,
       activeThisHand: false,
-      hideAtShowdown: false
+      hideAtShowdown: false,
+      shareCardsWithSpectators: false
     });
 
     socket.join(room.code);
@@ -816,7 +852,8 @@ io.on("connection", (socket) => {
       lastScore: null,
       isBot: true,
       activeThisHand: false,
-      hideAtShowdown: false
+      hideAtShowdown: false,
+      shareCardsWithSpectators: false
     };
 
     room.players.push(bot);
@@ -916,6 +953,20 @@ io.on("connection", (socket) => {
     emitRoom(room);
   });
 
+
+  socket.on("toggleSpectatorShare", () => {
+    const found = findPlayerRoom(socket.id);
+    if (!found) return;
+    const { room, player } = found;
+
+    if (["lobby", "showdown"].includes(room.phase)) return;
+    if (player.folded || player.chips <= 0 || player.isBot) return;
+
+    player.shareCardsWithSpectators = !player.shareCardsWithSpectators;
+    logHistory(room, `${player.name} ${player.shareCardsWithSpectators ? "allows spectators to see cards" : "hides cards from spectators"}.`, "privacy");
+    emitRoom(room);
+  });
+
   socket.on("sendEmote", ({ emoji }) => {
     const found = findPlayerRoom(socket.id);
     if (!found) return;
@@ -957,6 +1008,8 @@ io.on("connection", (socket) => {
     room.winners = [];
     room.busted = [];
     room.finalWinner = null;
+  room.revealWinnerIds = [];
+  room.lastAction = null;
     room.message = "Back to room. Dealer can reset stacks for another game.";
     room.lastAction = "Returned to lobby.";
     emitRoom(room);

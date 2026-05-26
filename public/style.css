@@ -1623,3 +1623,33 @@ input::placeholder { color: rgba(255,255,255,.55); }
     grid-template-columns: 1fr;
   }
 }
+
+
+/* v27 action feedback + spectator card share + chip effects */
+.playerSeat.turn, .seat.turn, .turnSpotlight { box-shadow: 0 0 0 2px rgba(255,214,92,.88), 0 0 28px rgba(255,214,92,.45), inset 0 0 22px rgba(255,214,92,.12) !important; }
+.turnSpotlight { animation: turnGlow 1.05s infinite alternate; }
+@keyframes turnGlow { from { filter: brightness(1); transform: scale(1); } to { filter: brightness(1.25); transform: scale(1.035); } }
+.actionToast { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%) scale(.92); z-index: 10020; pointer-events: none; opacity: 0; padding: 18px 28px; border-radius: 22px; background: rgba(0,0,0,.78); color: white; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 24px 80px rgba(0,0,0,.55); font-weight: 1000; font-size: clamp(22px, 4.5vw, 54px); letter-spacing: .04em; text-align: center; }
+.actionToast.show { animation: actionToastPop 1.25s ease-out forwards; }
+.actionToast.action-raise, .actionToast.action-allin { background: radial-gradient(circle at center, rgba(255,211,74,.96), rgba(122,65,0,.92)); color: #160b00; }
+.actionToast.action-fold { background: rgba(32,32,40,.86); color: #d4d4d8; }
+.actionToast.action-allin { font-size: clamp(28px, 5.5vw, 68px); }
+@keyframes actionToastPop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.72); } 16% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } 74% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -58%) scale(.94); } }
+.seatPulse { animation: seatPulse .9s ease-out; }
+.seatFoldPulse { animation: seatFoldPulse .9s ease-out; }
+.seatAllinPulse { animation: seatAllinPulse .9s ease-out; }
+@keyframes seatPulse { 0% { transform: scale(1); box-shadow: 0 0 0 rgba(111,231,255,0); } 35% { transform: scale(1.045); box-shadow: 0 0 30px rgba(111,231,255,.65); } 100% { transform: scale(1); box-shadow: 0 0 0 rgba(111,231,255,0); } }
+@keyframes seatFoldPulse { 0% { filter: grayscale(0); opacity: 1; } 45% { filter: grayscale(1); opacity: .52; transform: translateY(4px); } 100% { filter: grayscale(0); opacity: 1; } }
+@keyframes seatAllinPulse { 0% { transform: scale(1); } 25% { transform: scale(1.08) rotate(-1deg); box-shadow: 0 0 38px rgba(255,62,62,.75); } 55% { transform: scale(1.04) rotate(1deg); box-shadow: 0 0 52px rgba(255,211,74,.7); } 100% { transform: scale(1); } }
+.tableShake { animation: tableShake .5s ease-in-out; }
+@keyframes tableShake { 0%, 100% { transform: translateX(0); } 18% { transform: translateX(-7px); } 36% { transform: translateX(7px); } 54% { transform: translateX(-5px); } 72% { transform: translateX(5px); } }
+.flyingChip { position: fixed; z-index: 10010; left: 0; top: 0; pointer-events: none; min-width: 38px; height: 38px; padding: 0 8px; border-radius: 999px; display: grid; place-items: center; font-weight: 1000; color: #1b0e00; background: radial-gradient(circle at 35% 30%, #fff7b0, #ffca42 58%, #b86f00); border: 3px dashed rgba(80,37,0,.5); box-shadow: 0 10px 28px rgba(0,0,0,.35); animation: flyChip .78s cubic-bezier(.22,.9,.22,1) forwards; }
+@keyframes flyChip { 0% { opacity: 0; transform: translate(0, 0) scale(.6) rotate(0deg); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(.98) rotate(520deg); } }
+.chipDelta { position: absolute; right: 10px; top: 8px; z-index: 5; pointer-events: none; font-weight: 1000; font-size: 18px; text-shadow: 0 2px 8px rgba(0,0,0,.45); animation: chipDeltaFloat 1.3s ease-out forwards; }
+.chipUp { color: #9effb9; }
+.chipDown { color: #ff8c8c; }
+@keyframes chipDeltaFloat { 0% { opacity: 0; transform: translateY(8px) scale(.8); } 18% { opacity: 1; transform: translateY(0) scale(1.08); } 100% { opacity: 0; transform: translateY(-34px) scale(1); } }
+#spectatorShareBtn { border-radius: 999px; padding: 11px 15px; background: rgba(0,0,0,.62); color: #fff; border: 1px solid rgba(255,255,255,.16); box-shadow: 0 14px 36px rgba(0,0,0,.25); margin-top: 8px; }
+#spectatorShareBtn.shareActive { background: rgba(111,231,255,.22); color: #d9fbff; border-color: rgba(111,231,255,.48); }
+.shareBadge { background: rgba(111,231,255,.18) !important; color: #c8f8ff !important; }
+.revealBadge { background: rgba(255,80,80,.22) !important; color: #ffd1d1 !important; }

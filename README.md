@@ -147,3 +147,22 @@ Added:
   - Big Blind
 - Big blind is forced to be larger than small blind.
 - New values are used when the next hand starts.
+
+
+## v27 Action Feedback + Winner Reveal + Spectator Share + Chip FX
+
+Added:
+- Central action toast for CHECK / CALL / RAISE / ALL-IN / FOLD.
+- Current acting player gets stronger highlight.
+- Acting seat flashes after each move.
+- ALL-IN shakes the table.
+- CALL / RAISE / ALL-IN send flying chip animation toward the pot.
+- Chip stack changes show floating + / - numbers.
+- Biggest hand winner must reveal cards at showdown, even if hide cards is enabled.
+- Each player can toggle whether current spectators may see their cards this hand.
+
+Rules:
+- Hide at showdown still works for non-winning players.
+- Winner calculation always uses real cards.
+- Spectator share only affects viewers who are out of the hand / watching.
+- Settings reset each hand.
