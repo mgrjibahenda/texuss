@@ -17,7 +17,7 @@ const RANK_VALUE = Object.fromEntries(RANKS.map((r, i) => [r, i + 2]));
 function makeRoomCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
-  for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
   return code;
 }
 
@@ -546,7 +546,7 @@ function evaluateSeven(cards) {
   }
 
   for (const suit of Object.keys(suits)) {
-    if (suits[suit].length >= 5) return { rank: 5, tiebreak: uniqueDesc(suits[suit]).slice(0, 5), name: "Flush", cn: "同花", effect: "flush" };
+    if (suits[suit].length >= 5) return { rank: 5, tiebreak: uniqueDesc(suits[suit]).slice(0, 4), name: "Flush", cn: "同花", effect: "flush" };
   }
 
   const straight = straightHigh(values);
@@ -567,7 +567,7 @@ function evaluateSeven(cards) {
     return { rank: 1, tiebreak: [pair, ...values.filter(v => v !== pair).slice(0, 3)], name: "One Pair", cn: "一对", effect: "onepair" };
   }
 
-  return { rank: 0, tiebreak: values.slice(0, 5), name: "High Card", cn: "高牌", effect: "highcard" };
+  return { rank: 0, tiebreak: values.slice(0, 4), name: "High Card", cn: "高牌", effect: "highcard" };
 }
 
 function compareScore(a, b) {

@@ -65,3 +65,16 @@ Also includes:
 - Left-top LOG.
 - Emoji duplicate fix.
 - Busted text: `xxx 可以回家种地了`.
+
+
+## v25 Sequential Effects + 4-character Room Code
+
+Changes:
+- Room code changed from 5 characters to 4 characters.
+- Effects are now played in a strict queue:
+  1. Winner hand/card effect
+  2. Busted effect
+  3. FINAL WINNER effect
+- Effects do not overlap.
+- FINAL WINNER still auto closes after its display time.
+- Original uploaded main menu is kept; no Replit-style menu.

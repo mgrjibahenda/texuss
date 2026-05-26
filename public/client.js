@@ -555,76 +555,118 @@ function showShowdownEffect(winners, busted, finalWinner = null) {
   winners = winners || [];
   busted = busted || [];
 
-  if (finalWinner && busted.length) {
-    showBustedThenFinal(winners, busted, finalWinner);
-    return;
+  const steps = [];
+
+  if (winners.length) {
+    steps.push(() => showWinnerHandEffect(winners));
   }
 
-  showFinalOrShowdown(winners, busted, finalWinner);
+  if (busted.length) {
+    steps.push(() => showBustedEffectStep(busted));
+  }
+
+  if (finalWinner) {
+    steps.push(() => showFinalWinnerEffect(finalWinner, winners));
+  }
+
+  if (!steps.length) return;
+
+  runEffectQueue(steps);
 }
 
-function showBustedThenFinal(winners, busted, finalWinner) {
+function runEffectQueue(steps, index = 0) {
+  if (index >= steps.length) return;
+
+  removeOverlay("showOverlay");
+  const duration = steps[index]();
+
+  setTimeout(() => {
+    removeOverlay("showOverlay");
+    setTimeout(() => runEffectQueue(steps, index + 1), 280);
+  }, duration);
+}
+
+function showWinnerHandEffect(winners) {
+  if (!winners.length) return 0;
+
+  const strongest = winners.reduce((a, b) => (b.rank > a.rank ? b : a), winners[0]);
+  const effect = strongest.effect || "highcard";
+  const title = winners.length > 1 ? "SPLIT POT" : (strongest.handNameCn || "WINNER");
+
+  const winLines = winners.map(w => `
+    <div class="cleanWinnerName">${escapeHtml(w.name)}</div>
+    <div class="cleanWinnerHand">${escapeHtml(w.handNameCn || "胜利")} +${w.amount}</div>
+  `).join("<br>");
+
+  playSound("showdown", strongest.rank || 1);
+
+  const overlay = document.createElement("div");
+  overlay.id = "showOverlay";
+  overlay.className = `showOverlay showdown cleanShowOverlay effect-${effect}`;
+  overlay.innerHTML = `
+    <div class="showModal">
+      <div class="showTitle">${title}</div>
+      <div class="showDetails">${winLines}</div>
+    </div>
+    <div class="confetti"></div>
+  `;
+  document.body.appendChild(overlay);
+  return 3600;
+}
+
+function showBustedEffectStep(busted) {
+  if (!busted.length) return 0;
+
   playSound("bust");
-  const first = busted[0];
+  const bustLines = busted.map(b => escapeHtml(b.text || `${b.name} 可以回家种地了`)).join("<br>");
+
   const overlay = document.createElement("div");
   overlay.id = "showOverlay";
   overlay.className = "showOverlay showdown has-bust effect-foldwin";
   overlay.innerHTML = `
     <div class="showModal">
       <div class="showTitle">BUSTED</div>
-      <div class="showDetails">${escapeHtml(first?.text || `${first?.name || "玩家"} 可以回家种地了`)}</div>
-      <div class="roast">${escapeHtml(first?.name || "玩家")} 可以回家种地了</div>
+      <div class="showDetails">${bustLines}</div>
+      <div class="roast">${bustLines}</div>
     </div>
   `;
   document.body.appendChild(overlay);
-
-  setTimeout(() => {
-    removeOverlay("showOverlay");
-    showFinalOrShowdown(winners, [], finalWinner);
-  }, 2300);
+  return 3000;
 }
 
-function showFinalOrShowdown(winners, busted, finalWinner = null) {
-  removeOverlay("showOverlay");
-  if (!winners.length && !finalWinner) return;
+function showFinalWinnerEffect(finalWinner, winners = []) {
+  if (!finalWinner) return 0;
 
   const strongest = winners.length
     ? winners.reduce((a, b) => (b.rank > a.rank ? b : a), winners[0])
-    : { rank: 9, effect: "royal", handNameCn: "最终赢家" };
-
-  const effect = finalWinner ? "royal" : (strongest.effect || "highcard");
-  const title = finalWinner ? "FINAL WINNER" : (winners.length > 1 ? "SPLIT POT" : "SHOWDOWN");
-
-  const winLines = finalWinner
-    ? `<div class="cleanWinnerName">${escapeHtml(finalWinner.name)}</div><div class="cleanWinnerHand">最终赢家 · ${finalWinner.chips}</div>`
-    : winners.map(w => `<div class="cleanWinnerName">${escapeHtml(w.name)}</div><div class="cleanWinnerHand">${escapeHtml(w.handNameCn)} +${w.amount}</div>`).join("<br>");
-
-  const bustLines = (!finalWinner && busted.length)
-    ? `<div class="cleanBustedText">${busted.map(b => escapeHtml(b.text || `${b.name} 可以回家种地了`)).join("<br>")}</div>`
-    : "";
+    : { rank: 9 };
 
   playSound("showdown", strongest.rank || 9);
 
   const overlay = document.createElement("div");
   overlay.id = "showOverlay";
-  overlay.className = `showOverlay showdown cleanShowOverlay effect-${effect}${(!finalWinner && busted.length) ? " has-bust" : ""}${finalWinner ? " final-winner" : ""}`;
+  overlay.className = "showOverlay showdown cleanShowOverlay effect-royal final-winner";
   overlay.innerHTML = `
     <div class="showModal">
-      <div class="showTitle">${title}</div>
-      <div class="showDetails">${winLines}</div>
-      ${bustLines ? `<div class="roast">${bustLines}</div>` : ""}
+      <div class="showTitle">FINAL WINNER</div>
+      <div class="showDetails">
+        <div class="cleanWinnerName">${escapeHtml(finalWinner.name)}</div>
+        <div class="cleanWinnerHand">最终赢家 · ${finalWinner.chips}</div>
+      </div>
     </div>
     <div class="confetti"></div>
   `;
   document.body.appendChild(overlay);
-
-  // Important fix: FINAL WINNER overlay/effect must not stay forever.
-  const closeDelay = finalWinner ? 6500 : 5200;
-  setTimeout(() => {
-    const current = $("showOverlay");
-    if (current === overlay) removeOverlay("showOverlay");
-  }, closeDelay);
+  return 6500;
 }
+
+
+
+
+
+
+
+
 
 
 
