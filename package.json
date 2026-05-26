@@ -1,7 +1,7 @@
 {
-  "name": "texas-holdem-v27-action-visibility-chipfx",
-  "version": "27.0.0",
-  "description": "Action feedback, mandatory winner reveal, spectator card share, and chip animations.",
+  "name": "texas-holdem-v27-1-real-chip-stacks",
+  "version": "27.1.0",
+  "description": "Adds real visual chip stacks for players and pot.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -12,7 +12,8 @@
     "test:v25-2": "node tests/v25-2-boardpair-displayfix-test.js",
     "test:v25-3": "node tests/v25-3-fullhouse-displayfix-test.js",
     "test:v26": "node tests/v26-hide-hand-blinds-test.js",
-    "test:v27": "node tests/v27-action-visibility-chipfx-test.js"
+    "test:v27": "node tests/v27-action-visibility-chipfx-test.js",
+    "test:v27-1": "node tests/v27-1-real-chip-stacks-test.js"
   },
   "dependencies": {
     "express": "^4.18.3",

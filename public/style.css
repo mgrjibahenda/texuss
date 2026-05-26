@@ -1653,3 +1653,188 @@ input::placeholder { color: rgba(255,255,255,.55); }
 #spectatorShareBtn.shareActive { background: rgba(111,231,255,.22); color: #d9fbff; border-color: rgba(111,231,255,.48); }
 .shareBadge { background: rgba(111,231,255,.18) !important; color: #c8f8ff !important; }
 .revealBadge { background: rgba(255,80,80,.22) !important; color: #ffd1d1 !important; }
+
+
+/* v27.1 real visual chip stacks */
+.playerCard {
+  position: relative;
+}
+
+.playerChipArea {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  min-height: 34px;
+  margin: 3px 0 4px;
+}
+
+.realChipStack {
+  position: relative;
+  width: 48px;
+  height: 34px;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 8px 10px rgba(0,0,0,.28));
+}
+
+.realChip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--i) * 2.3px);
+  width: 34px;
+  height: 12px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background:
+    radial-gradient(ellipse at 50% 28%, rgba(255,255,255,.86), rgba(255,255,255,0) 32%),
+    linear-gradient(90deg, transparent 0 12%, rgba(255,255,255,.75) 12% 18%, transparent 18% 32%, rgba(255,255,255,.75) 32% 38%, transparent 38% 62%, rgba(255,255,255,.75) 62% 68%, transparent 68% 82%, rgba(255,255,255,.75) 82% 88%, transparent 88%),
+    linear-gradient(180deg, #ffd965, #d58b10);
+  border: 1px solid rgba(63,33,0,.45);
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,.18), 0 2px 0 rgba(80,35,0,.3);
+}
+
+.realChip::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  top: 3px;
+  height: 5px;
+  border-radius: 50%;
+  border: 1px solid rgba(55,27,0,.34);
+  background: rgba(255,255,255,.18);
+}
+
+.chipTier1 {
+  background:
+    radial-gradient(ellipse at 50% 28%, rgba(255,255,255,.82), rgba(255,255,255,0) 32%),
+    linear-gradient(90deg, transparent 0 12%, rgba(255,255,255,.75) 12% 18%, transparent 18% 32%, rgba(255,255,255,.75) 32% 38%, transparent 38% 62%, rgba(255,255,255,.75) 62% 68%, transparent 68% 82%, rgba(255,255,255,.75) 82% 88%, transparent 88%),
+    linear-gradient(180deg, #74e7ff, #0a81b8);
+}
+
+.chipTier2 {
+  background:
+    radial-gradient(ellipse at 50% 28%, rgba(255,255,255,.82), rgba(255,255,255,0) 32%),
+    linear-gradient(90deg, transparent 0 12%, rgba(255,255,255,.75) 12% 18%, transparent 18% 32%, rgba(255,255,255,.75) 32% 38%, transparent 38% 62%, rgba(255,255,255,.75) 62% 68%, transparent 68% 82%, rgba(255,255,255,.75) 82% 88%, transparent 88%),
+    linear-gradient(180deg, #ff8f8f, #b70e2a);
+}
+
+.chipTier3 {
+  background:
+    radial-gradient(ellipse at 50% 28%, rgba(255,255,255,.82), rgba(255,255,255,0) 32%),
+    linear-gradient(90deg, transparent 0 12%, rgba(255,255,255,.75) 12% 18%, transparent 18% 32%, rgba(255,255,255,.75) 32% 38%, transparent 38% 62%, rgba(255,255,255,.75) 62% 68%, transparent 68% 82%, rgba(255,255,255,.75) 82% 88%, transparent 88%),
+    linear-gradient(180deg, #d8b4ff, #7134b8);
+}
+
+.betChipMini {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 900;
+  color: #ffe7a3;
+  opacity: .95;
+}
+
+.betChipMini .realChipStack {
+  transform: scale(.62);
+  transform-origin: bottom center;
+  width: 30px;
+  margin-right: -8px;
+}
+
+.potPill {
+  position: relative;
+  overflow: visible;
+  padding-right: 76px !important;
+}
+
+#potChipStackMount {
+  position: absolute;
+  right: 12px;
+  bottom: -3px;
+  width: 58px;
+  height: 42px;
+  pointer-events: none;
+}
+
+.potChipStack {
+  position: relative;
+  width: 58px;
+  height: 42px;
+}
+
+.potRealChip {
+  position: absolute;
+  left: calc(50% + var(--x) * 3px);
+  bottom: calc(var(--i) * 1.75px);
+  width: 36px;
+  height: 12px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background:
+    radial-gradient(ellipse at 50% 28%, rgba(255,255,255,.86), rgba(255,255,255,0) 32%),
+    linear-gradient(90deg, transparent 0 12%, rgba(255,255,255,.75) 12% 18%, transparent 18% 32%, rgba(255,255,255,.75) 32% 38%, transparent 38% 62%, rgba(255,255,255,.75) 62% 68%, transparent 68% 82%, rgba(255,255,255,.75) 82% 88%, transparent 88%),
+    linear-gradient(180deg, #ffd965, #d58b10);
+  border: 1px solid rgba(63,33,0,.45);
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,.18), 0 2px 0 rgba(80,35,0,.3);
+}
+
+.potRealChip.chipTier1 {
+  background:
+    radial-gradient(ellipse at 50% 28%, rgba(255,255,255,.82), rgba(255,255,255,0) 32%),
+    linear-gradient(90deg, transparent 0 12%, rgba(255,255,255,.75) 12% 18%, transparent 18% 32%, rgba(255,255,255,.75) 32% 38%, transparent 38% 62%, rgba(255,255,255,.75) 62% 68%, transparent 68% 82%, rgba(255,255,255,.75) 82% 88%, transparent 88%),
+    linear-gradient(180deg, #74e7ff, #0a81b8);
+}
+
+.potRealChip.chipTier2 {
+  background:
+    radial-gradient(ellipse at 50% 28%, rgba(255,255,255,.82), rgba(255,255,255,0) 32%),
+    linear-gradient(90deg, transparent 0 12%, rgba(255,255,255,.75) 12% 18%, transparent 18% 32%, rgba(255,255,255,.75) 32% 38%, transparent 38% 62%, rgba(255,255,255,.75) 62% 68%, transparent 68% 82%, rgba(255,255,255,.75) 82% 88%, transparent 88%),
+    linear-gradient(180deg, #ff8f8f, #b70e2a);
+}
+
+.potRealChip.chipTier3 {
+  background:
+    radial-gradient(ellipse at 50% 28%, rgba(255,255,255,.82), rgba(255,255,255,0) 32%),
+    linear-gradient(90deg, transparent 0 12%, rgba(255,255,255,.75) 12% 18%, transparent 18% 32%, rgba(255,255,255,.75) 32% 38%, transparent 38% 62%, rgba(255,255,255,.75) 62% 68%, transparent 68% 82%, rgba(255,255,255,.75) 82% 88%, transparent 88%),
+    linear-gradient(180deg, #d8b4ff, #7134b8);
+}
+
+.playerSeat.winner .realChipStack {
+  animation: chipStackWinPulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes chipStackWinPulse {
+  from { transform: translateY(0) scale(1); }
+  to { transform: translateY(-2px) scale(1.06); }
+}
+
+@media (max-width: 760px) {
+  .realChipStack {
+    width: 38px;
+    height: 27px;
+  }
+
+  .realChip {
+    width: 28px;
+    height: 10px;
+    bottom: calc(var(--i) * 1.8px);
+  }
+
+  .playerChipArea {
+    min-height: 28px;
+    gap: 4px;
+  }
+
+  .potPill {
+    padding-right: 60px !important;
+  }
+
+  #potChipStackMount {
+    right: 8px;
+    width: 46px;
+    transform: scale(.86);
+    transform-origin: right bottom;
+  }
+}

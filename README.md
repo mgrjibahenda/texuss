@@ -166,3 +166,13 @@ Rules:
 - Winner calculation always uses real cards.
 - Spectator share only affects viewers who are out of the hand / watching.
 - Settings reset each hand.
+
+
+## v27.1 Real Visual Chip Stacks
+
+Fix:
+- v27 had chip movement and +/- chip numbers, but not persistent visible chip stacks.
+- v27.1 adds real visual chip stacks beside every player and inside the pot.
+- Bigger stack values produce taller visible stacks.
+- Current bet also shows a mini chip stack.
+- Action chip-fly animations now target the visible pot area more reliably.

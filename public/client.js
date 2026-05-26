@@ -198,6 +198,7 @@ function render() {
   $("code").textContent = state.code;
   $("message").textContent = state.message || "";
   $("pot").textContent = state.pot;
+  renderPotChipStack();
   $("phasePill").textContent = phaseName(state.phase);
   $("statusTitle").textContent = statusTitle();
 
@@ -360,6 +361,54 @@ function renderLobby(isHost) {
 
 
 
+
+function chipStackHTML(amount, extraClass = "") {
+  const value = Math.max(0, Number(amount) || 0);
+  const rawCount = value <= 0 ? 0 : Math.min(12, Math.max(2, Math.ceil(value / 120)));
+  const chips = [];
+
+  for (let i = 0; i < rawCount; i++) {
+    chips.push(`<span class="realChip chipTier${i % 4}" style="--i:${i}"></span>`);
+  }
+
+  return `
+    <div class="realChipStack ${extraClass}" title="${value} chips">
+      ${chips.join("")}
+    </div>
+  `;
+}
+
+function potChipStackHTML(amount) {
+  const value = Math.max(0, Number(amount) || 0);
+  const rawCount = value <= 0 ? 0 : Math.min(18, Math.max(3, Math.ceil(value / 100)));
+  const chips = [];
+
+  for (let i = 0; i < rawCount; i++) {
+    chips.push(`<span class="potRealChip chipTier${i % 4}" style="--i:${i}; --x:${(i % 5) - 2};"></span>`);
+  }
+
+  return `
+    <div class="potChipStack" title="Pot ${value}">
+      ${chips.join("")}
+    </div>
+  `;
+}
+
+function renderPotChipStack() {
+  const potPill = document.querySelector(".potPill");
+  if (!potPill || !state) return;
+
+  let stack = $("potChipStackMount");
+  if (!stack) {
+    stack = document.createElement("div");
+    stack.id = "potChipStackMount";
+    potPill.appendChild(stack);
+  }
+
+  stack.innerHTML = potChipStackHTML(state.pot || 0);
+}
+
+
 function renderCommunity() {
   const community = $("community");
   community.innerHTML = "";
@@ -376,6 +425,7 @@ function renderPlayers() {
   state.players.forEach((p, idx) => {
     const seat = document.createElement("div");
     seat.className = "playerSeat";
+    seat.dataset.seatPlayer = p.id;
     const angle = n === 2 ? idx * 180 - 90 : idx * (360 / n) - 90;
     seat.style.setProperty("--angle", `${angle}deg`);
     seat.style.setProperty("--radius", "calc(min(36vh, 36vw, 315px))");
@@ -405,6 +455,10 @@ function renderPlayers() {
         <div class="playerTop">
           <div class="playerName">${escapeHtml(p.name)}</div>
           <div class="chips">${p.chips}</div>
+        </div>
+        <div class="playerChipArea">
+          ${chipStackHTML(p.chips, "stack-player")}
+          ${p.bet ? `<div class="betChipMini">${chipStackHTML(p.bet, "stack-bet")}<span>Bet ${p.bet}</span></div>` : ""}
         </div>
         <div class="hand">${hand}</div>
         <div class="badges">${badges}</div>
@@ -519,7 +573,7 @@ function showActionToast(action) {
 
 function flashActionSeat(playerId, action) {
   if (!playerId) return;
-  const seat = document.querySelector(`[data-seat-player="${CSS.escape(playerId)}"]`);
+  const seat = document.querySelector(`[data-seat-player="${String(playerId).replace(/"/g, "\\\"")}"]`);
   if (!seat) return;
 
   seat.classList.remove("seatPulse", "seatFoldPulse", "seatAllinPulse");
@@ -532,8 +586,8 @@ function flashActionSeat(playerId, action) {
 }
 
 function animateChipsToPot(playerId, amount = 0) {
-  const seat = document.querySelector(`[data-seat-player="${CSS.escape(playerId)}"]`);
-  const pot = $("potAmount") || document.querySelector(".pot");
+  const seat = document.querySelector(`[data-seat-player="${String(playerId).replace(/"/g, "\\\"")}"]`);
+  const pot = document.querySelector(".potPill") || $("pot");
   if (!seat || !pot) return;
 
   const from = seat.getBoundingClientRect();
@@ -551,7 +605,7 @@ function animateChipsToPot(playerId, amount = 0) {
 
 function showChipDelta(playerId, delta) {
   if (!delta) return;
-  const seat = document.querySelector(`[data-seat-player="${CSS.escape(playerId)}"]`);
+  const seat = document.querySelector(`[data-seat-player="${String(playerId).replace(/"/g, "\\\"")}"]`);
   if (!seat) return;
   const badge = document.createElement("div");
   badge.className = `chipDelta ${delta > 0 ? "chipUp" : "chipDown"}`;
