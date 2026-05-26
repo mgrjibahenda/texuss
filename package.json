@@ -1,14 +1,12 @@
 {
-  "name": "texas-holdem-v23-1-bot-emotefix",
-  "version": "23.1.0",
-  "description": "Texas Hold'em with visible lobby bots, action log, sequential final effects, and fixed emote duplicate.",
+  "name": "texas-holdem-v24-2-original-menu-finalwinner-autoclose",
+  "version": "24.2.0",
+  "description": "Uploaded original menu base with bots/log/emote fix and final winner overlay auto close.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "test:public-final": "node tests/public-final-test.js",
-    "test:boardpair": "node tests/boardpair-display-test.js",
-    "test:v22": "node tests/v22-style-finalwinner-test.js",
-    "test:v23": "node tests/v23-1-bot-emotefix-test.js"
+    "test:v24": "node tests/v24-2-original-menu-finalwinner-autoclose-test.js"
   },
   "dependencies": {
     "express": "^4.18.3",
