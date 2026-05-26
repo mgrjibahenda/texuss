@@ -78,3 +78,33 @@ Changes:
 - Effects do not overlap.
 - FINAL WINNER still auto closes after its display time.
 - Original uploaded main menu is kept; no Replit-style menu.
+
+
+## v25.1 No Repeat Busted Effect
+
+Fix:
+- Old busted players no longer trigger busted effects again in later hands.
+- A player only appears in `busted` if:
+  1. they had chips at the start of the current hand, and
+  2. they ended the current hand with 0 chips.
+
+This keeps the existing effect order:
+1. Winner hand/card effect
+2. Newly busted players only
+3. FINAL WINNER effect
+
+
+## v25.2 Board Pair Display Fix
+
+Fix:
+- If the board itself makes a pair, and the player's hole cards do not improve it,
+  the displayed hand becomes High Card instead of One Pair.
+- Example:
+  - Board: 4♠ 5♣ 8♦ 5♦ J♥
+  - Player: Q♥ 3♠
+  - Real poker best hand includes board pair 5s
+  - Game display: High Card
+
+Important:
+- Winner calculation still uses normal poker comparison internally.
+- This change only affects displayed hand name/currentScore/showdown text.

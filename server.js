@@ -43,6 +43,75 @@ function displayScore(score) {
   };
 }
 
+function displayPersonalScore(holeCards, communityCards) {
+  if (!holeCards || holeCards.length !== 2 || !communityCards || communityCards.length < 3) return null;
+
+  const actual = evaluateSeven([...holeCards, ...communityCards]);
+  const boardOnly = communityCards.length >= 5 ? evaluateSeven(communityCards) : null;
+
+  // Custom display rule:
+  // Public-board made pairs/trips/etc should not be displayed as the player's own hand.
+  // Example board: 4♠ 5♣ 8♦ 5♦ J♥. Player Q♥ 3♠ should display High Card, not One Pair.
+  if (boardOnly && compareScore(actual, boardOnly) <= 0) {
+    const values = [...holeCards, ...communityCards]
+      .map(c => RANK_VALUE[c.rank])
+      .sort((a, b) => b - a)
+      .slice(0, 5);
+
+    return {
+      rank: 0,
+      name: "High Card",
+      cn: "高牌",
+      effect: "highcard",
+      tiebreak: values
+    };
+  }
+
+  const counts = {};
+  for (const c of [...holeCards, ...communityCards]) {
+    const v = RANK_VALUE[c.rank];
+    counts[v] = (counts[v] || 0) + 1;
+  }
+
+  const holeValues = [...new Set(holeCards.map(c => RANK_VALUE[c.rank]))].sort((a, b) => b - a);
+  const personalMadeRanks = holeValues.filter(v => counts[v] >= 2);
+
+  if (personalMadeRanks.length >= 2) {
+    return {
+      rank: 2,
+      name: "Two Pair",
+      cn: "两对",
+      effect: "twopair",
+      tiebreak: personalMadeRanks.slice(0, 2)
+    };
+  }
+
+  if (personalMadeRanks.length === 1) {
+    const v = personalMadeRanks[0];
+    if (counts[v] >= 4) return { rank: 7, name: "Four of a Kind", cn: "四条", effect: "fourkind", tiebreak: [v] };
+    if (counts[v] >= 3) return { rank: 3, name: "Three of a Kind", cn: "三条", effect: "threekind", tiebreak: [v] };
+    return { rank: 1, name: "One Pair", cn: "一对", effect: "onepair", tiebreak: [v] };
+  }
+
+  // Straights, flushes, full houses, etc. can still be real player-made hands if they beat the board alone.
+  if (actual.rank >= 4) return actual;
+
+  const values = [...holeCards, ...communityCards]
+    .map(c => RANK_VALUE[c.rank])
+    .sort((a, b) => b - a)
+    .slice(0, 5);
+
+  return {
+    rank: 0,
+    name: "High Card",
+    cn: "高牌",
+    effect: "highcard",
+    tiebreak: values
+  };
+}
+
+
+
 function makeDeck() {
   const deck = [];
   for (const suit of SUITS) {
@@ -73,7 +142,8 @@ function createRoom(hostId, hostName) {
       allIn: false,
       connected: true,
       lastScore: null,
-      isBot: false
+      isBot: false,
+      activeThisHand: false
     }],
     started: false,
     deck: [],
@@ -221,10 +291,11 @@ function publicRoom(room, viewerId) {
       folded: p.folded,
       allIn: p.allIn,
       connected: p.connected,
+      activeThisHand: !!p.activeThisHand,
       seat: idx,
       isYou: p.id === viewerId,
       currentScore: p.id === viewerId && !p.folded && p.hand.length === 2 && room.community.length >= 3
-        ? displayScore(evaluateSeven([...p.hand, ...room.community]))
+        ? displayScore(displayPersonalScore(p.hand, room.community))
         : null
     }))
   };
@@ -302,6 +373,7 @@ function startHand(room) {
     p.hand = [];
     p.bet = 0;
     p.totalCommitted = 0;
+    p.activeThisHand = p.chips > 0;
     p.folded = p.chips <= 0;
     p.allIn = false;
     p.lastScore = null;
@@ -451,24 +523,30 @@ function finishHand(room) {
         winners.push(p);
       }
     }
-    room.message = `${winners.map(w => w.name).join(", ")} win with ${best.cn}.`;
+    const shownBest = winners.length === 1 ? displayPersonalScore(winners[0].hand, room.community) : best;
+    room.message = `${winners.map(w => w.name).join(", ")} win with ${shownBest.cn}.`;
   }
 
   const share = Math.floor(room.pot / winners.length);
   for (const w of winners) w.chips += share;
 
-  room.winners = winners.map(w => ({
-    id: w.id,
-    name: w.name,
-    amount: share,
-    handName: w.lastScore?.name || "Fold Win",
-    handNameCn: w.lastScore?.cn || "弃牌胜利",
-    effect: w.lastScore?.effect || "foldwin",
-    rank: w.lastScore?.rank ?? -1
-  }));
+  room.winners = winners.map(w => {
+    const shownScore = displayPersonalScore(w.hand, room.community) || w.lastScore;
+    return {
+      id: w.id,
+      name: w.name,
+      amount: share,
+      handName: shownScore?.name || "Fold Win",
+      handNameCn: shownScore?.cn || "弃牌胜利",
+      effect: shownScore?.effect || "foldwin",
+      rank: shownScore?.rank ?? -1
+    };
+  });
 
+  // Only players who had chips at the start of THIS hand can newly bust.
+  // This prevents old busted spectators from triggering busted effects again.
   room.busted = room.players
-    .filter(p => p.chips <= 0 && !winners.some(w => w.id === p.id))
+    .filter(p => p.activeThisHand && p.chips <= 0 && !winners.some(w => w.id === p.id))
     .map(p => ({ id: p.id, name: p.name, text: `${p.name} 可以回家种地了` }));
 
   const survivors = room.players.filter(p => p.chips > 0);
@@ -645,7 +723,8 @@ io.on("connection", (socket) => {
       allIn: false,
       connected: true,
       lastScore: null,
-      isBot: false
+      isBot: false,
+      activeThisHand: false
     });
 
     socket.join(room.code);
@@ -706,7 +785,8 @@ io.on("connection", (socket) => {
       allIn: false,
       connected: true,
       lastScore: null,
-      isBot: true
+      isBot: true,
+      activeThisHand: false
     };
 
     room.players.push(bot);
