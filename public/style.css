@@ -1556,3 +1556,70 @@ input::placeholder { color: rgba(255,255,255,.55); }
 .showOverlay.final-winner {
   background: radial-gradient(circle at center, rgba(255,215,50,.24), rgba(0,0,0,.64) 60%, rgba(0,0,0,.9)) !important;
 }
+
+
+/* v26 hide-at-showdown + blind settings */
+.hideCardsPanel {
+  position: fixed;
+  right: 18px;
+  bottom: 88px;
+  z-index: 5100;
+  pointer-events: auto;
+}
+
+#hideCardsBtn {
+  border-radius: 999px;
+  padding: 11px 15px;
+  background: rgba(0,0,0,.62);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.16);
+  box-shadow: 0 14px 36px rgba(0,0,0,.35);
+}
+
+#hideCardsBtn.hideActive {
+  background: rgba(255, 210, 70, .92);
+  color: #111;
+  border-color: rgba(255,230,120,.9);
+}
+
+.hideBadge {
+  background: rgba(255, 210, 70, .22) !important;
+  color: #fff0a8 !important;
+}
+
+.blindSettings {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(130px, 1fr) auto;
+  gap: 10px;
+  grid-column: 1 / -1;
+  align-items: end;
+}
+
+#setBlindsBtn {
+  min-height: 54px;
+  background: rgba(111,231,255,.18);
+  color: #c8f8ff;
+  border: 1px solid rgba(111,231,255,.28);
+}
+
+.blindDisplay {
+  font-size: 18px;
+  font-weight: 1000;
+  color: var(--gold2);
+}
+
+@media (max-width: 760px) {
+  .hideCardsPanel {
+    right: 10px;
+    bottom: 78px;
+  }
+
+  #hideCardsBtn {
+    font-size: 12px;
+    padding: 9px 11px;
+  }
+
+  .blindSettings {
+    grid-template-columns: 1fr;
+  }
+}

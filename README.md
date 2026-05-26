@@ -108,3 +108,42 @@ Fix:
 Important:
 - Winner calculation still uses normal poker comparison internally.
 - This change only affects displayed hand name/currentScore/showdown text.
+
+
+## v25.3 Full House Display Fix
+
+Fix:
+- A player-made Full House was incorrectly displayed as Two Pair in cases such as:
+  - Hand: 3♣ 9♥
+  - Board: 9♦ 9♠ 3♦ J♦ K♣
+- The display result is now Full House / 葫芦.
+
+Reason:
+- The previous personal display function checked personal two-pair before checking large actual hands.
+- The new priority is:
+  1. If the board alone makes the same/better hand, display High Card under the custom board-pair rule.
+  2. If the actual hand is Straight or better, display the actual hand.
+  3. Otherwise display personal pair/two-pair/high-card.
+
+
+## v26 Hide Hand at Showdown + Blind Settings
+
+Added:
+
+### Hide hand at showdown
+- During a hand, each human player gets a button:
+  - `End: Show My Cards`
+  - `End: Hide Cards ON`
+- If enabled, at showdown:
+  - the player can still see their own cards
+  - other players see the hidden player's cards as card backs
+- This only affects display.
+- Winner calculation and hand evaluation still use the real cards.
+- Hide setting resets at the start of each new hand.
+
+### Blind settings
+- In lobby, host can set:
+  - Small Blind
+  - Big Blind
+- Big blind is forced to be larger than small blind.
+- New values are used when the next hand starts.

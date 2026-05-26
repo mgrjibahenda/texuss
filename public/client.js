@@ -208,6 +208,7 @@ function render() {
   renderPlayers();
   renderPersonalHandHint();
   renderActions();
+  renderHideCardsControl();
   renderHistoryLog();
   renderEmotes();
   spawnIncomingEmotes();
@@ -288,7 +289,13 @@ function renderLobby(isHost) {
   }
 
   if (!isHost) {
-    controls.innerHTML = `<div class="chipCard">Waiting for dealer to set stacks and start.</div>`;
+    controls.innerHTML = `
+      <div class="chipCard">Waiting for dealer to set stacks, blinds, and start.</div>
+      <div class="chipCard">
+        <label>Current blinds</label>
+        <div class="blindDisplay">Small ${state.smallBlind} / Big ${state.bigBlind}</div>
+      </div>
+    `;
     return;
   }
 
@@ -305,6 +312,19 @@ function renderLobby(isHost) {
       <input id="allChipAmount" value="1000" type="number" min="0" step="10" placeholder="Set all stacks to..." />
       <button id="setAllBtn">Set All</button>
     </div>
+
+    <div class="blindSettings">
+      <div class="chipCard">
+        <label>Small Blind</label>
+        <input id="smallBlindInput" value="${state.smallBlind}" type="number" min="1" step="1" />
+      </div>
+      <div class="chipCard">
+        <label>Big Blind</label>
+        <input id="bigBlindInput" value="${state.bigBlind}" type="number" min="2" step="1" />
+      </div>
+      <button id="setBlindsBtn">Set Blinds</button>
+    </div>
+
     ${playerCards}
   `;
 
@@ -324,7 +344,16 @@ function renderLobby(isHost) {
   $("setAllBtn").onclick = () => {
     socket.emit("setAllChips", { chips: Number($("allChipAmount").value) });
   };
+
+  $("setBlindsBtn").onclick = () => {
+    socket.emit("setBlinds", {
+      smallBlind: Number($("smallBlindInput").value),
+      bigBlind: Number($("bigBlindInput").value)
+    });
+  };
 }
+
+
 
 
 
@@ -361,6 +390,7 @@ function renderPlayers() {
       p.folded ? `<span class="badge">Fold</span>` : "",
       p.isBot ? `<span class="badge botBadge">BOT</span>` : "",
       p.isYou ? `<span class="badge">You</span>` : "",
+      p.isYou && p.hideAtShowdown && !["lobby", "showdown"].includes(state.phase) ? `<span class="badge hideBadge">Hide End</span>` : "",
       p.chips <= 0 ? `<span class="badge bustedBadge">Spectating</span>` : "",
       p.isYou && p.currentScore && p.currentScore.rank >= 1 && !p.folded && state.phase !== "showdown" ? `<span class="badge handmadeBadge">${escapeHtml(p.currentScore.cn)}</span>` : ""
     ].filter(Boolean).join("");
@@ -395,6 +425,39 @@ function renderPersonalHandHint() {
     lastPersonalScoreKey = key;
     showPersonalHandEffect(me.currentScore);
   }
+}
+
+
+
+function renderHideCardsControl() {
+  let panel = $("hideCardsPanel");
+  if (!panel) {
+    panel = document.createElement("section");
+    panel.id = "hideCardsPanel";
+    panel.className = "hideCardsPanel hidden";
+    document.body.appendChild(panel);
+  }
+
+  if (!state || ["lobby", "showdown"].includes(state.phase)) {
+    panel.classList.add("hidden");
+    return;
+  }
+
+  const me = state.players.find(p => p.isYou);
+  if (!me || me.folded || me.chips <= 0 || me.isBot) {
+    panel.classList.add("hidden");
+    return;
+  }
+
+  panel.classList.remove("hidden");
+  panel.innerHTML = `
+    <button id="hideCardsBtn" class="${me.hideAtShowdown ? "hideActive" : ""}">
+      ${me.hideAtShowdown ? "🙈 End: Hide Cards ON" : "👁️ End: Show My Cards"}
+    </button>
+  `;
+
+  const btn = $("hideCardsBtn");
+  if (btn) btn.onclick = () => socket.emit("toggleHideAtShowdown");
 }
 
 

@@ -51,6 +51,7 @@ function displayPersonalScore(holeCards, communityCards) {
 
   // Custom display rule:
   // Public-board made pairs/trips/etc should not be displayed as the player's own hand.
+  // If the board itself makes the same or better hand, do not display the board-made pair as the player's own hand.
   // Example board: 4♠ 5♣ 8♦ 5♦ J♥. Player Q♥ 3♠ should display High Card, not One Pair.
   if (boardOnly && compareScore(actual, boardOnly) <= 0) {
     const values = [...holeCards, ...communityCards]
@@ -66,6 +67,12 @@ function displayPersonalScore(holeCards, communityCards) {
       tiebreak: values
     };
   }
+
+  // Important priority fix:
+  // Straights, flushes, full houses, four of a kind, straight flush, etc.
+  // must be shown before pair/two-pair logic.
+  // Example: hand 3♣ 9♥ + board 9♦ 9♠ 3♦ J♦ K♣ is Full House, not Two Pair.
+  if (actual.rank >= 4) return actual;
 
   const counts = {};
   for (const c of [...holeCards, ...communityCards]) {
@@ -93,9 +100,6 @@ function displayPersonalScore(holeCards, communityCards) {
     return { rank: 1, name: "One Pair", cn: "一对", effect: "onepair", tiebreak: [v] };
   }
 
-  // Straights, flushes, full houses, etc. can still be real player-made hands if they beat the board alone.
-  if (actual.rank >= 4) return actual;
-
   const values = [...holeCards, ...communityCards]
     .map(c => RANK_VALUE[c.rank])
     .sort((a, b) => b - a)
@@ -109,6 +113,8 @@ function displayPersonalScore(holeCards, communityCards) {
     tiebreak: values
   };
 }
+
+
 
 
 
@@ -143,7 +149,8 @@ function createRoom(hostId, hostName) {
       connected: true,
       lastScore: null,
       isBot: false,
-      activeThisHand: false
+      activeThisHand: false,
+      hideAtShowdown: false
     }],
     started: false,
     deck: [],
@@ -285,11 +292,12 @@ function publicRoom(room, viewerId) {
       chips: p.chips,
       bet: p.bet,
       totalCommitted: p.totalCommitted,
-      hand: p.id === viewerId || room.phase === "showdown"
+      hand: p.id === viewerId || (room.phase === "showdown" && !p.hideAtShowdown)
         ? p.hand.map(displayCard)
         : p.hand.map(() => ({ code: "BACK", display: "🂠" })),
       folded: p.folded,
       allIn: p.allIn,
+      hideAtShowdown: !!p.hideAtShowdown,
       connected: p.connected,
       activeThisHand: !!p.activeThisHand,
       seat: idx,
@@ -374,6 +382,7 @@ function startHand(room) {
     p.bet = 0;
     p.totalCommitted = 0;
     p.activeThisHand = p.chips > 0;
+    p.hideAtShowdown = false;
     p.folded = p.chips <= 0;
     p.allIn = false;
     p.lastScore = null;
@@ -724,7 +733,8 @@ io.on("connection", (socket) => {
       connected: true,
       lastScore: null,
       isBot: false,
-      activeThisHand: false
+      activeThisHand: false,
+      hideAtShowdown: false
     });
 
     socket.join(room.code);
@@ -766,6 +776,25 @@ io.on("connection", (socket) => {
   });
 
 
+
+  socket.on("setBlinds", ({ smallBlind, bigBlind }) => {
+    const found = findPlayerRoom(socket.id);
+    if (!found) return;
+    const { room } = found;
+
+    if (room.hostId !== socket.id || room.phase !== "lobby") return;
+
+    const sb = Math.max(1, Math.floor(Number(smallBlind) || room.smallBlind || 10));
+    const bb = Math.max(sb + 1, Math.floor(Number(bigBlind) || room.bigBlind || 20));
+
+    room.smallBlind = sb;
+    room.bigBlind = bb;
+    room.minRaise = bb;
+    room.message = `Blinds set to ${sb}/${bb}.`;
+    logHistory(room, room.message, "host");
+    emitRoom(room);
+  });
+
   socket.on("addBot", () => {
     const found = findPlayerRoom(socket.id);
     if (!found) return;
@@ -786,7 +815,8 @@ io.on("connection", (socket) => {
       connected: true,
       lastScore: null,
       isBot: true,
-      activeThisHand: false
+      activeThisHand: false,
+      hideAtShowdown: false
     };
 
     room.players.push(bot);
@@ -871,6 +901,20 @@ io.on("connection", (socket) => {
     emitRoom(room);
   });
 
+
+
+  socket.on("toggleHideAtShowdown", () => {
+    const found = findPlayerRoom(socket.id);
+    if (!found) return;
+    const { room, player } = found;
+
+    if (["lobby", "showdown"].includes(room.phase)) return;
+    if (player.folded || player.chips <= 0 || player.isBot) return;
+
+    player.hideAtShowdown = !player.hideAtShowdown;
+    logHistory(room, `${player.name} ${player.hideAtShowdown ? "will hide" : "will show"} cards at showdown.`, "privacy");
+    emitRoom(room);
+  });
 
   socket.on("sendEmote", ({ emoji }) => {
     const found = findPlayerRoom(socket.id);
